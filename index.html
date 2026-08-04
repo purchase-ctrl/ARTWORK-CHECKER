@@ -230,6 +230,12 @@
 
     <div class="card no-print">
       <h2><span class="n">→</span>Run the check</h2>
+      <div class="btn-row" style="margin-bottom:10px;">
+        <label>Formulation code
+          <input type="text" id="formulation-code" placeholder="e.g. FM-1042" style="font-family:var(--mono);width:140px;">
+        </label>
+        <span class="hint">Optional — looks up your spreadsheet to cross-check ingredients &amp; shelf life for this formulation.</span>
+      </div>
       <div class="btn-row">
         <button id="analyze-btn" disabled>Check Artwork</button>
         <span class="hint" id="analyze-hint">Upload an artwork image first.</span>
@@ -250,10 +256,18 @@
           <tbody id="checklist-body"></tbody>
         </table>
 
-        <h2 style="margin-top:18px;"><span class="n">B</span>Spelling issues</h2>
+        <div id="crosscheck-section" style="display:none;">
+          <h2 style="margin-top:18px;"><span class="n">B</span>Ingredient &amp; shelf-life cross-check</h2>
+          <table>
+            <thead><tr><th style="width:34%;">Against spreadsheet</th><th style="width:14%;">Status</th><th>Note</th></tr></thead>
+            <tbody id="crosscheck-body"></tbody>
+          </table>
+        </div>
+
+        <h2 style="margin-top:18px;"><span class="n" id="spelling-letter">C</span>Spelling issues</h2>
         <div id="spelling-list"></div>
 
-        <h2 style="margin-top:18px;"><span class="n">C</span>Grammar issues</h2>
+        <h2 style="margin-top:18px;"><span class="n" id="grammar-letter">D</span>Grammar issues</h2>
         <div id="grammar-list"></div>
       </div>
       <div class="btn-row no-print" style="margin-top:-6px;">
@@ -467,12 +481,27 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 /* ================= compliance analysis ================= */
 analyzeBtn.addEventListener('click', analyzeArtwork);
 
-function buildPrompt(){
+function buildPrompt(referenceRecord, formulationCode){
   const rulesText = CHECKLIST_RULES.map(r=>`- ${r.label}: ${r.detail}`).join('\n');
+  let crossCheckBlock = '';
+  let jsonKeysBlock = '';
+  if(referenceRecord){
+    crossCheckBlock = `
+
+You are also given internal reference data for formulation code "${formulationCode}", pulled from the company's master spreadsheet:
+${JSON.stringify(referenceRecord)}
+
+Using that reference data, cross-check two things against what is printed on the artwork:
+1. Ingredients — find whichever field(s) in the reference data list the approved ingredients / INCI list, and compare it against the ingredient list printed on the artwork. Flag anything printed that isn't in the approved list, anything approved that's missing from the artwork, and any spelling/ordering differences that change meaning.
+2. Shelf life — find whichever field(s) in the reference data specify the approved shelf life / expiry duration for this formulation, and compare it against the shelf-life or "Use Before" duration printed on the artwork.`;
+    jsonKeysBlock = `,
+  "ingredient_check": {"status": "pass" | "fail" | "unclear", "note": "<what matched or didn't, referencing specific ingredients>"},
+  "shelf_life_check": {"status": "pass" | "fail" | "unclear", "note": "<the approved value vs what's printed>"}`;
+  }
   return `You are a meticulous packaging/label quality-control inspector for a cosmetics manufacturer. Examine the attached artwork image closely (zoom into small print mentally) and evaluate it against this mandatory checklist:
 ${rulesText}
 
-Also proofread every piece of visible text on the artwork for spelling mistakes and grammar mistakes (wrong articles, tense, punctuation, awkward phrasing, inconsistent capitalization of mandatory legal text, etc). Do not flag brand names, coined product names, or intentional stylization as errors.
+Also proofread every piece of visible text on the artwork for spelling mistakes and grammar mistakes (wrong articles, tense, punctuation, awkward phrasing, inconsistent capitalization of mandatory legal text, etc). Do not flag brand names, coined product names, or intentional stylization as errors.${crossCheckBlock}
 
 Respond with ONLY raw JSON (no markdown code fences, no commentary before or after), exactly in this shape:
 {
@@ -485,19 +514,40 @@ Respond with ONLY raw JSON (no markdown code fences, no commentary before or aft
   "grammar_errors": [
     {"found_text": "<exact text as printed>", "suggestion": "<corrected text>", "context": "<short surrounding context>"}
   ],
-  "overall_summary": "<2-3 sentence plain-language summary of the artwork's compliance state and biggest issues, or confirmation it looks clean>"
+  "overall_summary": "<2-3 sentence plain-language summary of the artwork's compliance state and biggest issues, or confirmation it looks clean>"${jsonKeysBlock}
 }
 Include one checklist entry per rule listed above, in the same order. If a field cannot be verified from the image, use status "unclear" and say why in the note. If there are no spelling or grammar errors, return empty arrays for those.`;
+}
+
+async function lookupFormulation(code){
+  const response = await fetch("/api/sheet-lookup", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ formulationCode: code })
+  });
+  const data = await response.json().catch(()=>({}));
+  if(!response.ok){
+    throw new Error(data.error || ('Spreadsheet lookup failed with status '+response.status));
+  }
+  return data.record;
 }
 
 async function analyzeArtwork(){
   if(!uploadedFile) return;
   analyzeBtn.disabled = true;
   const loadingBox = document.getElementById('loading-box');
-  loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Reading artwork and checking against the checklist…</div>`;
   document.getElementById('results-wrap').style.display='none';
 
+  const formulationCode = document.getElementById('formulation-code').value.trim();
+
   try{
+    let referenceRecord = null;
+    if(formulationCode){
+      loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Looking up formulation ${escapeHtml(formulationCode)} in the spreadsheet…</div>`;
+      referenceRecord = await lookupFormulation(formulationCode);
+    }
+
+    loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Reading artwork and checking against the checklist…</div>`;
     const base64 = uploadedFile.dataUrl.split(',')[1];
     const response = await fetch("/api/analyze", {
       method:"POST",
@@ -505,7 +555,7 @@ async function analyzeArtwork(){
       body: JSON.stringify({
         imageBase64: base64,
         mediaType: uploadedFile.mediaType,
-        prompt: buildPrompt()
+        prompt: buildPrompt(referenceRecord, formulationCode)
       })
     });
     if(!response.ok){
@@ -520,7 +570,7 @@ async function analyzeArtwork(){
     loadingBox.innerHTML = '';
   }catch(err){
     console.error(err);
-    loadingBox.innerHTML = `<div class="error-box">Couldn't complete the check: ${escapeHtml(err.message||'unknown error')}. If this keeps happening, check that the ANTHROPIC_API_KEY is set on the server.</div>`;
+    loadingBox.innerHTML = `<div class="error-box">Couldn't complete the check: ${escapeHtml(err.message||'unknown error')}.</div>`;
   }finally{
     analyzeBtn.disabled = false;
   }
@@ -540,12 +590,16 @@ function renderResults(parsed){
   const spellCount = (parsed.spelling_errors||[]).length;
   const grammarCount = (parsed.grammar_errors||[]).length;
 
+  const hasCrossCheck = !!(parsed.ingredient_check || parsed.shelf_life_check);
+  const crossFailCount = [parsed.ingredient_check, parsed.shelf_life_check].filter(c=>c && c.status==='fail').length;
+
   document.getElementById('summary-strip').innerHTML = `
     <span class="pill pass">${passCount} passed</span>
     <span class="pill fail">${failCount} failed</span>
     <span class="pill warn">${unclearCount} to verify</span>
     <span class="pill ${spellCount?'fail':'pass'}">${spellCount} spelling issue${spellCount===1?'':'s'}</span>
     <span class="pill ${grammarCount?'fail':'pass'}">${grammarCount} grammar issue${grammarCount===1?'':'s'}</span>
+    ${hasCrossCheck ? `<span class="pill ${crossFailCount?'fail':'pass'}">${crossFailCount} spreadsheet mismatch${crossFailCount===1?'':'es'}</span>` : ''}
   `;
   document.getElementById('summary-text').textContent = parsed.overall_summary || '';
 
@@ -559,6 +613,29 @@ function renderResults(parsed){
       <td>${escapeHtml(row.note||'')}</td>`;
     body.appendChild(tr);
   });
+
+  const crossSection = document.getElementById('crosscheck-section');
+  const crossBody = document.getElementById('crosscheck-body');
+  crossBody.innerHTML='';
+  if(hasCrossCheck){
+    crossSection.style.display='block';
+    [
+      ['Ingredients', parsed.ingredient_check],
+      ['Shelf life', parsed.shelf_life_check]
+    ].forEach(([label, check])=>{
+      if(!check) return;
+      const tr = document.createElement('tr');
+      const statusClass = check.status==='pass'?'pass':check.status==='fail'?'fail':'unclear';
+      tr.innerHTML = `<td>${label}</td>
+        <td><span class="status-badge ${statusClass}">${(check.status||'unclear').toUpperCase()}</span></td>
+        <td>${escapeHtml(check.note||'')}</td>`;
+      crossBody.appendChild(tr);
+    });
+  } else {
+    crossSection.style.display='none';
+  }
+  document.getElementById('spelling-letter').textContent = hasCrossCheck ? 'C' : 'B';
+  document.getElementById('grammar-letter').textContent = hasCrossCheck ? 'D' : 'C';
 
   document.getElementById('spelling-list').innerHTML = renderIssues(parsed.spelling_errors);
   document.getElementById('grammar-list').innerHTML = renderIssues(parsed.grammar_errors);
