@@ -6,7 +6,7 @@
 <title>Artwork QC — Compliance &amp; Measurement</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
   :root{
     --paper:#F7F5EF;
@@ -326,7 +326,7 @@ let uploadedFile = null;   // {dataUrl, mediaType, name, size}
 let uploadedImage = null;  // HTMLImageElement, shared by both tabs
 
 if(window.pdfjsLib){
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 }
 let currentPdfDoc = null;   // pdfjs document, kept so the user can switch pages
 let currentPdfFileMeta = null; // {name}
