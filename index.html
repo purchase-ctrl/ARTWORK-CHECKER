@@ -275,8 +275,8 @@
           </select>
         </label>
         <button class="mode-btn" data-mode="calibrate" id="mode-calibrate">1 · Calibrate</button>
-        <button class="mode-btn" data-mode="length" id="mode-length">Measure Length</button>
-        <button class="mode-btn" data-mode="area" id="mode-area">Measure Area</button>
+        <button class="mode-btn" data-mode="length" id="mode-length" title="Calibrate first to get real-world units">Measure Length</button>
+        <button class="mode-btn" data-mode="area" id="mode-area" title="Calibrate first to get real-world units">Measure Area</button>
         <button class="ghost small" id="clear-measurements">Clear all</button>
       </div>
       <p class="hint" id="measure-hint">Upload an artwork image above, then tap "Calibrate" and drag across a known length (e.g. a ruler, or an edge you know the real size of).</p>
@@ -718,6 +718,10 @@ window.addEventListener('pointerup', e=>{
 document.querySelectorAll('.mode-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     if(!uploadedImage){ alert('Upload an artwork image first.'); return; }
+    if(btn.dataset.mode!=='calibrate' && !pxPerMM){
+      alert('Calibrate first — drag "1 · Calibrate" across a known length so results come back in real units instead of pixels.');
+      return;
+    }
     if(mode===btn.dataset.mode){
       mode=null; calibForm.style.display='none';
     } else {
@@ -734,7 +738,11 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
   });
 });
 function updateModeButtons(){
-  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  document.querySelectorAll('.mode-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.mode===mode);
+    const locked = b.dataset.mode!=='calibrate' && !pxPerMM;
+    b.style.opacity = locked ? '0.45' : '1';
+  });
 }
 
 /* ---- calibration ---- */
