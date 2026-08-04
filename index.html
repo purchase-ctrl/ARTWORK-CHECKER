@@ -279,7 +279,7 @@
         <button class="mode-btn" data-mode="area" id="mode-area">Measure Area</button>
         <button class="ghost small" id="clear-measurements">Clear all</button>
       </div>
-      <p class="hint" id="measure-hint">Upload an artwork image above, then tap "Calibrate" and click two points across a known length (e.g. a ruler, or an edge you know the real size of).</p>
+      <p class="hint" id="measure-hint">Upload an artwork image above, then tap "Calibrate" and drag across a known length (e.g. a ruler, or an edge you know the real size of).</p>
 
       <div class="canvas-wrap" id="canvas-wrap">
         <canvas id="measure-canvas"></canvas>
@@ -293,11 +293,6 @@
         <button class="ghost small" id="calib-cancel-btn">Cancel</button>
       </div>
       <div class="calib-status" id="calib-status">Not calibrated yet — measurements will show in pixels only.</div>
-
-      <div id="area-finish-row" class="btn-row no-print" style="display:none;margin-top:10px;">
-        <button class="small" id="area-close-btn">Close shape &amp; calculate</button>
-        <button class="ghost small" id="area-cancel-btn">Cancel shape</button>
-      </div>
 
       <div class="measure-list" id="measure-list"></div>
     </div>
@@ -589,16 +584,19 @@ const canvasWrap = document.getElementById('canvas-wrap');
 const unitSelect = document.getElementById('unit-select');
 const calibForm = document.getElementById('calib-form');
 const calibStatus = document.getElementById('calib-status');
-const areaFinishRow = document.getElementById('area-finish-row');
 const measureHint = document.getElementById('measure-hint');
 
 let scale = 1;               // canvas px per natural image px
 let pxPerMM = null;           // calibration
 let mode = null;              // 'calibrate' | 'length' | 'area'
-let pendingPoints = [];       // points collected for current action (canvas space)
-let shapes = [];              // saved {type, points, valueMM/valueMM2, color, label}
+let shapes = [];              // saved {type, points:[start,end], label, valueMM/valueWidthMM/valueHeightMM, color}
 const colorPalette = ['#1F4E5F','#B23A32','#2F6B4F','#B9812C','#6B4C9A','#2C7DA0'];
 let colorIdx = 0;
+
+let dragging = false;
+let dragStart = null;
+let dragCurrent = null;
+const MIN_DRAG_PX = 4; // ignore accidental taps
 
 function initCanvas(){
   const maxW = Math.min(canvasWrap.clientWidth || 860, 860);
@@ -610,7 +608,7 @@ function initCanvas(){
   canvas.style.height = canvas.height+'px';
   pxPerMM = null;
   shapes = [];
-  pendingPoints = [];
+  dragging = false; dragStart = null; dragCurrent = null;
   mode = null;
   updateModeButtons();
   updateCalibStatus();
@@ -625,24 +623,8 @@ function redraw(){
 
   shapes.forEach(s=>drawShape(s));
 
-  if(pendingPoints.length){
-    ctx.strokeStyle = '#1F4E5F';
-    ctx.fillStyle = '#1F4E5F';
-    ctx.lineWidth = 2;
-    if(mode==='area' && pendingPoints.length>1){
-      ctx.beginPath();
-      ctx.moveTo(pendingPoints[0].x, pendingPoints[0].y);
-      pendingPoints.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-      ctx.stroke();
-    } else if(pendingPoints.length===2){
-      ctx.beginPath();
-      ctx.moveTo(pendingPoints[0].x, pendingPoints[0].y);
-      ctx.lineTo(pendingPoints[1].x, pendingPoints[1].y);
-      ctx.stroke();
-    }
-    pendingPoints.forEach(p=>{
-      ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();
-    });
+  if(dragging && dragStart && dragCurrent){
+    drawShape({type: mode==='area' ? 'area' : 'calibrate-or-length', points:[dragStart, dragCurrent], color:'#1F4E5F', label:null, preview:true});
   }
 }
 
@@ -650,34 +632,31 @@ function drawShape(s){
   ctx.strokeStyle = s.color;
   ctx.fillStyle = s.color;
   ctx.lineWidth = 2;
-  if(s.type==='length'){
-    ctx.beginPath();
-    ctx.moveTo(s.points[0].x, s.points[0].y);
-    ctx.lineTo(s.points[1].x, s.points[1].y);
-    ctx.stroke();
-    drawLabel(s.label, midpoint(s.points[0], s.points[1]), s.color);
-  } else if(s.type==='calibration'){
-    ctx.setLineDash([6,4]);
+
+  if(s.type==='area'){
+    const x = Math.min(s.points[0].x, s.points[1].x);
+    const y = Math.min(s.points[0].y, s.points[1].y);
+    const w = Math.abs(s.points[1].x - s.points[0].x);
+    const h = Math.abs(s.points[1].y - s.points[0].y);
+    ctx.globalAlpha = 0.12;
+    ctx.fillRect(x,y,w,h);
+    ctx.globalAlpha = 1;
+    ctx.strokeRect(x,y,w,h);
+    if(s.label) drawLabel(s.label, {x:x+w/2, y:y+h/2}, s.color);
+  } else {
+    if(s.type==='calibration') ctx.setLineDash([6,4]);
     ctx.beginPath();
     ctx.moveTo(s.points[0].x, s.points[0].y);
     ctx.lineTo(s.points[1].x, s.points[1].y);
     ctx.stroke();
     ctx.setLineDash([]);
-    drawLabel('CAL: '+s.label, midpoint(s.points[0], s.points[1]), s.color);
-  } else if(s.type==='area'){
-    ctx.beginPath();
-    ctx.moveTo(s.points[0].x, s.points[0].y);
-    s.points.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
-    ctx.closePath();
-    ctx.globalAlpha = 0.12;
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.stroke();
-    const cx = s.points.reduce((a,p)=>a+p.x,0)/s.points.length;
-    const cy = s.points.reduce((a,p)=>a+p.y,0)/s.points.length;
-    drawLabel(s.label, {x:cx,y:cy}, s.color);
+    if(s.label) drawLabel((s.type==='calibration'?'CAL: ':'')+s.label, midpoint(s.points[0], s.points[1]), s.color);
   }
-  s.points.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();});
+
+  if(!s.preview){
+    ctx.beginPath();ctx.arc(s.points[0].x,s.points[0].y,3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(s.points[1].x,s.points[1].y,3,0,Math.PI*2);ctx.fill();
+  }
 }
 
 function drawLabel(text, pos, color){
@@ -699,25 +678,40 @@ function midpoint(a,b){return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};}
 
 function canvasPointFromEvent(e){
   const rect = canvas.getBoundingClientRect();
-  const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX);
-  const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY);
+  const rawX = (e.clientX - rect.left) * (canvas.width/rect.width);
+  const rawY = (e.clientY - rect.top) * (canvas.height/rect.height);
   return {
-    x: (clientX - rect.left) * (canvas.width/rect.width),
-    y: (clientY - rect.top) * (canvas.height/rect.height)
+    x: Math.max(0, Math.min(canvas.width, rawX)),
+    y: Math.max(0, Math.min(canvas.height, rawY))
   };
 }
 
+/* ---- drag interaction (covers calibrate, length, area) ---- */
 canvas.addEventListener('pointerdown', e=>{
   if(!uploadedImage || !mode) return;
-  const pt = canvasPointFromEvent(e);
-  pendingPoints.push(pt);
-
-  if(mode==='calibrate' && pendingPoints.length===2){
-    openCalibForm();
-  } else if(mode==='length' && pendingPoints.length===2){
-    finalizeLength();
-  }
+  e.preventDefault();
+  dragging = true;
+  dragStart = canvasPointFromEvent(e);
+  dragCurrent = dragStart;
   redraw();
+});
+window.addEventListener('pointermove', e=>{
+  if(!dragging) return;
+  dragCurrent = canvasPointFromEvent(e);
+  redraw();
+});
+window.addEventListener('pointerup', e=>{
+  if(!dragging) return;
+  dragging = false;
+  const end = canvasPointFromEvent(e);
+  const start = dragStart;
+  dragStart = null; dragCurrent = null;
+
+  if(dist(start,end) < MIN_DRAG_PX){ redraw(); return; } // ignore accidental tap
+
+  if(mode==='calibrate') openCalibForm(start,end);
+  else if(mode==='length') finalizeLength(start,end);
+  else if(mode==='area') finalizeArea(start,end);
 });
 
 /* ---- mode buttons ---- */
@@ -725,17 +719,15 @@ document.querySelectorAll('.mode-btn').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     if(!uploadedImage){ alert('Upload an artwork image first.'); return; }
     if(mode===btn.dataset.mode){
-      mode=null; pendingPoints=[]; calibForm.style.display='none'; areaFinishRow.style.display='none';
+      mode=null; calibForm.style.display='none';
     } else {
       mode = btn.dataset.mode;
-      pendingPoints=[];
       calibForm.style.display='none';
-      areaFinishRow.style.display = mode==='area' ? 'flex' : 'none';
       measureHint.textContent = mode==='calibrate'
-        ? 'Click two points along a length you know the real size of (e.g. a printed ruler mark, or a die-line dimension).'
+        ? 'Drag along a length you know the real size of (e.g. a printed ruler mark, or a die-line dimension).'
         : mode==='length'
-        ? 'Click a start point and an end point to measure a distance.'
-        : 'Click each corner of the area you want to measure, then press "Close shape & calculate".';
+        ? 'Drag from the start point to the end point to measure a distance.'
+        : 'Drag a rectangle over the area you want to measure — you\'ll get it back as length × breadth.';
     }
     updateModeButtons();
     redraw();
@@ -746,33 +738,38 @@ function updateModeButtons(){
 }
 
 /* ---- calibration ---- */
-function openCalibForm(){
+let pendingCalibPoints = null;
+function openCalibForm(start,end){
+  pendingCalibPoints = [start,end];
   calibForm.style.display='flex';
   document.getElementById('calib-unit-label').textContent = unitSelect.value;
   document.getElementById('calib-value').focus();
+  redraw();
+  drawShape({type:'calibration', points:[start,end], color:'#B9812C', label:'?'});
 }
 document.getElementById('calib-set-btn').addEventListener('click', ()=>{
   const val = parseFloat(document.getElementById('calib-value').value);
   if(!val || val<=0){ alert('Enter a valid positive length.'); return; }
   const mm = toMM(val, unitSelect.value);
-  const pixelDist = dist(pendingPoints[0], pendingPoints[1]);
+  const pixelDist = dist(pendingCalibPoints[0], pendingCalibPoints[1]);
   pxPerMM = pixelDist / mm;
 
   shapes = shapes.filter(s=>s.type!=='calibration'); // keep only one calibration line visible
   shapes.push({
-    type:'calibration', points:[...pendingPoints],
+    type:'calibration', points:[...pendingCalibPoints],
     label: `${val} ${unitSelect.value}`, color:'#B9812C'
   });
 
-  pendingPoints=[];
+  pendingCalibPoints = null;
   calibForm.style.display='none';
   document.getElementById('calib-value').value='';
   mode=null; updateModeButtons();
   updateCalibStatus();
+  renderMeasureList();
   redraw();
 });
 document.getElementById('calib-cancel-btn').addEventListener('click', ()=>{
-  pendingPoints=[]; calibForm.style.display='none'; mode=null; updateModeButtons(); redraw();
+  pendingCalibPoints = null; calibForm.style.display='none'; mode=null; updateModeButtons(); redraw();
 });
 function updateCalibStatus(){
   if(pxPerMM){
@@ -785,8 +782,8 @@ function updateCalibStatus(){
 }
 
 /* ---- length measurement ---- */
-function finalizeLength(){
-  const pixelDist = dist(pendingPoints[0], pendingPoints[1]);
+function finalizeLength(start,end){
+  const pixelDist = dist(start,end);
   const color = nextColor();
   let label, valueMM=null;
   if(pxPerMM){
@@ -795,35 +792,30 @@ function finalizeLength(){
   } else {
     label = pixelDist.toFixed(0)+' px';
   }
-  shapes.push({type:'length', points:[...pendingPoints], label, valueMM, color});
-  pendingPoints=[];
+  shapes.push({type:'length', points:[start,end], label, valueMM, color});
   mode=null; updateModeButtons();
   renderMeasureList();
   redraw();
 }
 
-/* ---- area measurement ---- */
-document.getElementById('area-close-btn').addEventListener('click', ()=>{
-  if(pendingPoints.length<3){ alert('Click at least 3 points to form a shape.'); return; }
-  const areaPx = shoelaceArea(pendingPoints);
+/* ---- area (L x B) measurement ---- */
+function finalizeArea(start,end){
+  const widthPx = Math.abs(end.x - start.x);
+  const heightPx = Math.abs(end.y - start.y);
   const color = nextColor();
-  let label, valueMM2=null;
+  let label, valueWidthMM=null, valueHeightMM=null;
   if(pxPerMM){
-    valueMM2 = areaPx / (pxPerMM*pxPerMM);
-    label = formatArea(valueMM2);
+    valueWidthMM = widthPx / pxPerMM;
+    valueHeightMM = heightPx / pxPerMM;
+    label = formatLxB(valueWidthMM, valueHeightMM);
   } else {
-    label = areaPx.toFixed(0)+' px²';
+    label = widthPx.toFixed(0)+' × '+heightPx.toFixed(0)+' px';
   }
-  shapes.push({type:'area', points:[...pendingPoints], label, valueMM2, color});
-  pendingPoints=[];
+  shapes.push({type:'area', points:[start,end], label, valueWidthMM, valueHeightMM, color});
   mode=null; updateModeButtons();
-  areaFinishRow.style.display='none';
   renderMeasureList();
   redraw();
-});
-document.getElementById('area-cancel-btn').addEventListener('click', ()=>{
-  pendingPoints=[]; mode=null; updateModeButtons(); areaFinishRow.style.display='none'; redraw();
-});
+}
 
 document.getElementById('clear-measurements').addEventListener('click', ()=>{
   shapes = shapes.filter(s=>s.type==='calibration');
@@ -852,18 +844,9 @@ function formatLength(mm){
   const u = unitSelect.value;
   return fromMM(mm,u).toFixed(2)+' '+u;
 }
-function formatArea(mm2){
+function formatLxB(widthMM, heightMM){
   const u = unitSelect.value;
-  const factor = u==='mm' ? 1 : u==='cm' ? 100 : 645.16; // mm² per unit²
-  return (mm2/factor).toFixed(2)+' '+u+'\u00B2';
-}
-function shoelaceArea(pts){
-  let sum=0;
-  for(let i=0;i<pts.length;i++){
-    const p1=pts[i], p2=pts[(i+1)%pts.length];
-    sum += p1.x*p2.y - p2.x*p1.y;
-  }
-  return Math.abs(sum/2);
+  return fromMM(widthMM,u).toFixed(2)+' × '+fromMM(heightMM,u).toFixed(2)+' '+u;
 }
 function nextColor(){
   const c = colorPalette[colorIdx % colorPalette.length];
@@ -876,13 +859,13 @@ function renderMeasureList(){
   const measurable = shapes.filter(s=>s.type!=='calibration');
   if(!measurable.length){ list.innerHTML=''; return; }
   list.innerHTML = measurable.map((s,i)=>{
-    let val = '—';
+    let val;
     if(s.type==='length' && s.valueMM!=null) val = formatLength(s.valueMM);
-    else if(s.type==='area' && s.valueMM2!=null) val = formatArea(s.valueMM2);
+    else if(s.type==='area' && s.valueWidthMM!=null) val = formatLxB(s.valueWidthMM, s.valueHeightMM);
     else val = s.label;
     return `<div class="measure-row">
       <span class="swatch" style="background:${s.color};"></span>
-      ${s.type==='length'?'Length':'Area'} ${i+1}
+      ${s.type==='length'?'Length':'L × B'} ${i+1}
       <span class="val">${val}</span>
     </div>`;
   }).join('');
