@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Artwork QC — Compliance &amp; Measurement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F7F5EF;
+    --paper-dim:#EFEBDF;
+    --card:#FFFFFF;
+    --ink:#1E1B16;
+    --ink-soft:#615C4E;
+    --line:#DAD3C0;
+    --accent:#1F4E5F;
+    --accent-soft:#DCE7E8;
+    --pass:#2F6B4F;
+    --pass-bg:#E3EFE8;
+    --fail:#B23A32;
+    --fail-bg:#F6E4E1;
+    --warn:#B9812C;
+    --warn-bg:#F6ECDA;
+    --mono:'IBM Plex Mono', ui-monospace, monospace;
+    --sans:'IBM Plex Sans', -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .app{max-width:920px;margin:0 auto;padding:20px 16px 80px;}
+
+  /* ---------- header ---------- */
+  .masthead{
+    position:relative;
+    padding:22px 20px;
+    border:1px solid var(--ink);
+    background:var(--card);
+    margin-bottom:18px;
+  }
+  .corner{position:absolute;width:14px;height:14px;}
+  .corner.tl{top:-1px;left:-1px;border-top:2px solid var(--accent);border-left:2px solid var(--accent);}
+  .corner.tr{top:-1px;right:-1px;border-top:2px solid var(--accent);border-right:2px solid var(--accent);}
+  .corner.bl{bottom:-1px;left:-1px;border-bottom:2px solid var(--accent);border-left:2px solid var(--accent);}
+  .corner.br{bottom:-1px;right:-1px;border-bottom:2px solid var(--accent);border-right:2px solid var(--accent);}
+  .masthead .eyebrow{
+    font-family:var(--mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 6px;
+  }
+  .masthead h1{margin:0 0 4px;font-size:26px;letter-spacing:-.01em;}
+  .masthead p{margin:0;color:var(--ink-soft);font-size:13.5px;}
+
+  /* ---------- upload ---------- */
+  .upload-card{
+    background:var(--card);border:1px solid var(--line);padding:16px;margin-bottom:18px;
+  }
+  .dropzone{
+    border:1.5px dashed var(--line);
+    padding:22px 16px;text-align:center;cursor:pointer;
+    background:var(--paper-dim);
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone:hover, .dropzone.drag{border-color:var(--accent);background:var(--accent-soft);}
+  .dropzone svg{margin-bottom:6px;}
+  .dropzone .dz-title{font-weight:600;font-size:14px;}
+  .dropzone .dz-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px;}
+  .file-row{
+    display:flex;align-items:center;gap:12px;margin-top:12px;
+  }
+  .file-row img{width:56px;height:56px;object-fit:cover;border:1px solid var(--line);background:var(--paper-dim);}
+  .file-row .file-name{font-family:var(--mono);font-size:12.5px;font-weight:600;word-break:break-all;}
+  .file-row .file-meta{font-size:11.5px;color:var(--ink-soft);}
+  .file-row button{margin-left:auto;}
+  #file-input{display:none;}
+
+  /* ---------- tabs ---------- */
+  .tabs{display:flex;gap:0;border-bottom:1px solid var(--ink);margin-bottom:18px;}
+  .tab-btn{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;
+    background:none;border:none;padding:10px 16px;cursor:pointer;color:var(--ink-soft);
+    border-bottom:2px solid transparent;margin-bottom:-1px;
+  }
+  .tab-btn.active{color:var(--ink);border-bottom-color:var(--accent);font-weight:600;}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* ---------- generic ---------- */
+  .card{background:var(--card);border:1px solid var(--line);padding:16px;margin-bottom:16px;}
+  .card h2{font-size:15px;margin:0 0 10px;}
+  h2 .n{font-family:var(--mono);color:var(--accent);margin-right:6px;}
+  button{
+    font-family:var(--sans);font-size:13px;font-weight:600;
+    padding:9px 16px;border:1px solid var(--ink);background:var(--ink);color:var(--paper);
+    cursor:pointer;
+  }
+  button.secondary{background:var(--card);color:var(--ink);}
+  button.ghost{background:none;border-color:var(--line);color:var(--ink-soft);font-weight:500;}
+  button:disabled{opacity:.4;cursor:not-allowed;}
+  button.small{padding:5px 10px;font-size:12px;}
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  select, input[type=number]{
+    font-family:var(--sans);font-size:13px;padding:8px 10px;border:1px solid var(--line);background:var(--card);
+  }
+  label{font-size:12.5px;color:var(--ink-soft);}
+  details summary{cursor:pointer;font-size:13px;font-weight:600;padding:4px 0;}
+  .rules-list{list-style:none;margin:10px 0 0;padding:0;font-size:13px;}
+  .rules-list li{padding:7px 0;border-top:1px solid var(--line);}
+  .rules-list li b{display:block;font-size:13px;}
+  .rules-list li span{color:var(--ink-soft);font-size:12.5px;}
+
+  /* ---------- loading ---------- */
+  .loading{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12.5px;color:var(--ink-soft);padding:12px 0;}
+  .spinner{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .error-box{background:var(--fail-bg);color:var(--fail);border:1px solid var(--fail);padding:10px 12px;font-size:13px;margin-top:10px;}
+
+  /* ---------- results ---------- */
+  .summary-strip{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+  .pill{font-family:var(--mono);font-size:11.5px;padding:5px 10px;border:1px solid var(--line);}
+  .pill.pass{color:var(--pass);border-color:var(--pass);background:var(--pass-bg);}
+  .pill.fail{color:var(--fail);border-color:var(--fail);background:var(--fail-bg);}
+  .pill.warn{color:var(--warn);border-color:var(--warn);background:var(--warn-bg);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.05em;
+    text-align:left;color:var(--ink-soft);border-bottom:1px solid var(--ink);padding:6px 8px;
+  }
+  td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .status-badge{
+    font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;display:inline-block;white-space:nowrap;
+  }
+  .status-badge.pass{color:var(--pass);background:var(--pass-bg);}
+  .status-badge.fail{color:var(--fail);background:var(--fail-bg);}
+  .status-badge.unclear{color:var(--warn);background:var(--warn-bg);}
+  .issue-item{border-top:1px solid var(--line);padding:9px 0;font-size:13px;}
+  .issue-item:first-child{border-top:none;}
+  .issue-item .found{font-family:var(--mono);color:var(--fail);text-decoration:line-through;}
+  .issue-item .suggest{font-family:var(--mono);color:var(--pass);}
+  .issue-item .ctx{color:var(--ink-soft);font-size:12px;margin-top:2px;}
+  .none-found{color:var(--ink-soft);font-size:13px;font-style:italic;}
+  .report-meta{font-family:var(--mono);font-size:11.5px;color:var(--ink-soft);margin-bottom:14px;}
+  .summary-text{font-size:13.5px;background:var(--paper-dim);padding:10px 12px;border-left:2px solid var(--accent);margin-bottom:16px;}
+
+  /* ---------- measurement ---------- */
+  .measure-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+  .mode-btn{background:var(--card);color:var(--ink);border:1px solid var(--line);}
+  .mode-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+  .canvas-wrap{border:1px solid var(--line);background:repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 0 0/16px 16px;overflow:auto;}
+  canvas{display:block;touch-action:none;cursor:crosshair;}
+  .calib-form{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px;background:var(--paper-dim);padding:10px;border-left:2px solid var(--warn);}
+  .calib-status{font-family:var(--mono);font-size:12px;margin-top:10px;color:var(--ink-soft);}
+  .calib-status.ok{color:var(--pass);}
+  .measure-list{margin-top:12px;}
+  .measure-row{
+    display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12.5px;
+    padding:7px 0;border-top:1px solid var(--line);
+  }
+  .measure-row .swatch{width:10px;height:10px;flex:none;}
+  .measure-row .val{margin-left:auto;font-weight:600;}
+  .measure-row button{margin-left:8px;}
+  .hint{font-size:12px;color:var(--ink-soft);margin-top:8px;}
+
+  /* ---------- print ---------- */
+  .no-print{}
+  @media print{
+    body{background:#fff;}
+    .no-print{display:none !important;}
+    .app{max-width:100%;padding:0;}
+    #print-area{display:block !important;}
+    .card{border:none;padding:0;margin-bottom:20px;}
+    table{page-break-inside:auto;}
+    tr{page-break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="masthead">
+    <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
+    <p class="eyebrow">Sunshine Industries · Label Inspection</p>
+    <h1>Artwork QC</h1>
+    <p>Check packaging artwork against your mandatory checklist, catch spelling/grammar slips, and measure any area of the artwork on screen.</p>
+  </header>
+
+  <div class="upload-card no-print">
+    <div class="dropzone" id="dropzone">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#615C4E" stroke-width="1.6"><path d="M12 16V4M12 4l-4 4M12 4l4 4"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      <div class="dz-title">Upload artwork image</div>
+      <div class="dz-sub">Tap to choose a file, or drag &amp; drop · PNG / JPG / WEBP</div>
+    </div>
+    <input type="file" id="file-input" accept="image/*">
+    <div class="file-row" id="file-row" style="display:none;">
+      <img id="file-thumb" alt="">
+      <div>
+        <div class="file-name" id="file-name"></div>
+        <div class="file-meta" id="file-meta"></div>
+      </div>
+      <button class="secondary" id="change-file-btn">Change</button>
+    </div>
+  </div>
+
+  <nav class="tabs no-print">
+    <button class="tab-btn active" data-tab="compliance">01 · Compliance Check</button>
+    <button class="tab-btn" data-tab="measure">02 · Measurement Tool</button>
+  </nav>
+
+  <!-- ============ COMPLIANCE TAB ============ -->
+  <section class="tab-panel active" id="tab-compliance">
+
+    <div class="card no-print">
+      <details>
+        <summary>Standard checklist being applied (from ARTWORK DECORATION FINAL)</summary>
+        <ul class="rules-list" id="rules-list"></ul>
+      </details>
+    </div>
+
+    <div class="card no-print">
+      <h2><span class="n">→</span>Run the check</h2>
+      <div class="btn-row">
+        <button id="analyze-btn" disabled>Check Artwork</button>
+        <span class="hint" id="analyze-hint">Upload an artwork image first.</span>
+      </div>
+      <div id="loading-box"></div>
+    </div>
+
+    <div id="results-wrap" style="display:none;">
+      <div class="card" id="print-area">
+        <div class="report-meta" id="report-meta"></div>
+        <h2 style="font-size:17px;">Compliance Report</h2>
+        <div class="summary-strip" id="summary-strip"></div>
+        <div class="summary-text" id="summary-text"></div>
+
+        <h2><span class="n">A</span>Checklist</h2>
+        <table>
+          <thead><tr><th style="width:34%;">Requirement</th><th style="width:14%;">Status</th><th>Note</th></tr></thead>
+          <tbody id="checklist-body"></tbody>
+        </table>
+
+        <h2 style="margin-top:18px;"><span class="n">B</span>Spelling issues</h2>
+        <div id="spelling-list"></div>
+
+        <h2 style="margin-top:18px;"><span class="n">C</span>Grammar issues</h2>
+        <div id="grammar-list"></div>
+      </div>
+      <div class="btn-row no-print" style="margin-top:-6px;">
+        <button id="print-btn" class="secondary">Print Report</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ MEASUREMENT TAB ============ -->
+  <section class="tab-panel" id="tab-measure">
+    <div class="card">
+      <h2><span class="n">→</span>Measurement tool</h2>
+      <div class="measure-toolbar">
+        <label>Unit
+          <select id="unit-select">
+            <option value="mm">mm</option>
+            <option value="cm">cm</option>
+            <option value="inch">inch</option>
+          </select>
+        </label>
+        <button class="mode-btn" data-mode="calibrate" id="mode-calibrate">1 · Calibrate</button>
+        <button class="mode-btn" data-mode="length" id="mode-length">Measure Length</button>
+        <button class="mode-btn" data-mode="area" id="mode-area">Measure Area</button>
+        <button class="ghost small" id="clear-measurements">Clear all</button>
+      </div>
+      <p class="hint" id="measure-hint">Upload an artwork image above, then tap "Calibrate" and click two points across a known length (e.g. a ruler, or an edge you know the real size of).</p>
+
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="measure-canvas"></canvas>
+      </div>
+
+      <div class="calib-form no-print" id="calib-form" style="display:none;">
+        <label>Real-world length of that line:</label>
+        <input type="number" id="calib-value" step="any" min="0" style="width:90px;" placeholder="e.g. 50">
+        <span id="calib-unit-label" style="font-family:var(--mono);font-size:12.5px;"></span>
+        <button class="small" id="calib-set-btn">Set Calibration</button>
+        <button class="ghost small" id="calib-cancel-btn">Cancel</button>
+      </div>
+      <div class="calib-status" id="calib-status">Not calibrated yet — measurements will show in pixels only.</div>
+
+      <div id="area-finish-row" class="btn-row no-print" style="display:none;margin-top:10px;">
+        <button class="small" id="area-close-btn">Close shape &amp; calculate</button>
+        <button class="ghost small" id="area-cancel-btn">Cancel shape</button>
+      </div>
+
+      <div class="measure-list" id="measure-list"></div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ================= shared state ================= */
+const CHECKLIST_RULES = [
+  {id:'batch', label:'Batch No.', detail:'A batch number field/placeholder must be present on the artwork.'},
+  {id:'mfgdate', label:'Mfg. Date', detail:'A manufacturing date field/placeholder must be present.'},
+  {id:'mrp', label:'M.R.P ₹ (incl. of all taxes)', detail:'MRP must be stated and marked inclusive of all taxes.'},
+  {id:'mrp_per_ml', label:'M.R.P per ml/gm restriction', detail:'M.R.P. per ml/gm must NOT appear if the stated net volume/weight is below 8 ml or 8 gm.'},
+  {id:'expiry', label:'Use Before / Expiry Date', detail:'Must show "Expiry Date/Use Before:" with a date, OR "Use Before XX months from the date of manufacturing" where XX is only 24 or 36.'},
+  {id:'mfdby', label:'Mfd. By statement', detail:'Must show: Mfd. By: Sunshine Industries, Plot no. 3&4, HPSIDC Extension, Industrial Area Baddi, District Solan, Himachal Pradesh - 173205.'},
+  {id:'mlno', label:'M.L. No.', detail:'Must show M.L. No. - HIM/COS/15/210.'},
+  {id:'marketedby', label:'Marketed By', detail:'Marketer name and address must be present — the address is mandatory.'},
+  {id:'customercare', label:'Customer Care Details', detail:'Contact number, email ID and address must all be present (address may match Marketed By or differ).'},
+  {id:'netcontent', label:'Net Content / Net Volume / Net Wt.', detail:'At least one of these must be present on the monocarton.'},
+  {id:'ean', label:'EAN Code (barcode)', detail:'Optional. If present, it must be an 8 or 13 digit barcode.'},
+  {id:'batcharea', label:'Blank Batch Coding Area', detail:'A blank area reserved for batch coding must always be present on the artwork.'}
+];
+
+let uploadedFile = null;   // {dataUrl, mediaType, name, size}
+let uploadedImage = null;  // HTMLImageElement, shared by both tabs
+
+/* ================= rules reference list ================= */
+const rulesList = document.getElementById('rules-list');
+CHECKLIST_RULES.forEach(r=>{
+  const li = document.createElement('li');
+  li.innerHTML = `<b>${r.label}</b><span>${r.detail}</span>`;
+  rulesList.appendChild(li);
+});
+
+/* ================= upload handling ================= */
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('file-input');
+const fileRow = document.getElementById('file-row');
+const fileThumb = document.getElementById('file-thumb');
+const fileNameEl = document.getElementById('file-name');
+const fileMetaEl = document.getElementById('file-meta');
+const analyzeBtn = document.getElementById('analyze-btn');
+const analyzeHint = document.getElementById('analyze-hint');
+
+dropzone.addEventListener('click', ()=>fileInput.click());
+dropzone.addEventListener('dragover', e=>{e.preventDefault();dropzone.classList.add('drag');});
+dropzone.addEventListener('dragleave', ()=>dropzone.classList.remove('drag'));
+dropzone.addEventListener('drop', e=>{
+  e.preventDefault();dropzone.classList.remove('drag');
+  if(e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', e=>{
+  if(e.target.files[0]) handleFile(e.target.files[0]);
+});
+document.getElementById('change-file-btn').addEventListener('click', ()=>fileInput.click());
+
+function handleFile(file){
+  if(!file.type.startsWith('image/')){
+    alert('Please upload an image file (PNG, JPG, or WEBP).');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    uploadedFile = {dataUrl:reader.result, mediaType:file.type, name:file.name, size:file.size};
+    dropzone.style.display='none';
+    fileRow.style.display='flex';
+    fileThumb.src = reader.result;
+    fileNameEl.textContent = file.name;
+    fileMetaEl.textContent = (file.size/1024).toFixed(0)+' KB · '+file.type;
+    analyzeBtn.disabled = false;
+    analyzeHint.textContent = 'Ready to check against the standard checklist.';
+    // reset previous results
+    document.getElementById('results-wrap').style.display='none';
+
+    const img = new Image();
+    img.onload = ()=>{
+      uploadedImage = img;
+      initCanvas();
+    };
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ================= tabs ================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+/* ================= compliance analysis ================= */
+analyzeBtn.addEventListener('click', analyzeArtwork);
+
+function buildPrompt(){
+  const rulesText = CHECKLIST_RULES.map(r=>`- ${r.label}: ${r.detail}`).join('\n');
+  return `You are a meticulous packaging/label quality-control inspector for a cosmetics manufacturer. Examine the attached artwork image closely (zoom into small print mentally) and evaluate it against this mandatory checklist:
+${rulesText}
+
+Also proofread every piece of visible text on the artwork for spelling mistakes and grammar mistakes (wrong articles, tense, punctuation, awkward phrasing, inconsistent capitalization of mandatory legal text, etc). Do not flag brand names, coined product names, or intentional stylization as errors.
+
+Respond with ONLY raw JSON (no markdown code fences, no commentary before or after), exactly in this shape:
+{
+  "checklist": [
+    {"item": "<rule label>", "status": "pass" | "fail" | "unclear", "note": "<short 1-sentence note, mention what you saw or what is missing>"}
+  ],
+  "spelling_errors": [
+    {"found_text": "<exact text as printed>", "suggestion": "<corrected text>", "context": "<short surrounding context>"}
+  ],
+  "grammar_errors": [
+    {"found_text": "<exact text as printed>", "suggestion": "<corrected text>", "context": "<short surrounding context>"}
+  ],
+  "overall_summary": "<2-3 sentence plain-language summary of the artwork's compliance state and biggest issues, or confirmation it looks clean>"
+}
+Include one checklist entry per rule listed above, in the same order. If a field cannot be verified from the image, use status "unclear" and say why in the note. If there are no spelling or grammar errors, return empty arrays for those.`;
+}
+
+async function analyzeArtwork(){
+  if(!uploadedFile) return;
+  analyzeBtn.disabled = true;
+  const loadingBox = document.getElementById('loading-box');
+  loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Reading artwork and checking against the checklist…</div>`;
+  document.getElementById('results-wrap').style.display='none';
+
+  try{
+    const base64 = uploadedFile.dataUrl.split(',')[1];
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        model:"claude-sonnet-4-6",
+        max_tokens:1800,
+        messages:[{
+          role:"user",
+          content:[
+            {type:"image", source:{type:"base64", media_type: uploadedFile.mediaType, data: base64}},
+            {type:"text", text: buildPrompt()}
+          ]
+        }]
+      })
+    });
+    const data = await response.json();
+    const textBlock = (data.content||[]).map(b=>b.text||"").join("\n");
+    const clean = textBlock.replace(/```json/g,'').replace(/```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    renderResults(parsed);
+    loadingBox.innerHTML = '';
+  }catch(err){
+    console.error(err);
+    loadingBox.innerHTML = `<div class="error-box">Something went wrong reading the artwork. Please try again — if it keeps failing, try a clearer or smaller image.</div>`;
+  }finally{
+    analyzeBtn.disabled = false;
+  }
+}
+
+function renderResults(parsed){
+  const wrap = document.getElementById('results-wrap');
+  wrap.style.display='block';
+
+  document.getElementById('report-meta').textContent =
+    `File: ${uploadedFile.name}  ·  Checked: ${new Date().toLocaleString()}`;
+
+  const checklist = parsed.checklist || [];
+  const passCount = checklist.filter(c=>c.status==='pass').length;
+  const failCount = checklist.filter(c=>c.status==='fail').length;
+  const unclearCount = checklist.filter(c=>c.status==='unclear').length;
+  const spellCount = (parsed.spelling_errors||[]).length;
+  const grammarCount = (parsed.grammar_errors||[]).length;
+
+  document.getElementById('summary-strip').innerHTML = `
+    <span class="pill pass">${passCount} passed</span>
+    <span class="pill fail">${failCount} failed</span>
+    <span class="pill warn">${unclearCount} to verify</span>
+    <span class="pill ${spellCount?'fail':'pass'}">${spellCount} spelling issue${spellCount===1?'':'s'}</span>
+    <span class="pill ${grammarCount?'fail':'pass'}">${grammarCount} grammar issue${grammarCount===1?'':'s'}</span>
+  `;
+  document.getElementById('summary-text').textContent = parsed.overall_summary || '';
+
+  const body = document.getElementById('checklist-body');
+  body.innerHTML='';
+  checklist.forEach(row=>{
+    const tr = document.createElement('tr');
+    const statusClass = row.status==='pass'?'pass':row.status==='fail'?'fail':'unclear';
+    tr.innerHTML = `<td>${escapeHtml(row.item||'')}</td>
+      <td><span class="status-badge ${statusClass}">${(row.status||'unclear').toUpperCase()}</span></td>
+      <td>${escapeHtml(row.note||'')}</td>`;
+    body.appendChild(tr);
+  });
+
+  document.getElementById('spelling-list').innerHTML = renderIssues(parsed.spelling_errors);
+  document.getElementById('grammar-list').innerHTML = renderIssues(parsed.grammar_errors);
+
+  wrap.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function renderIssues(list){
+  if(!list || !list.length) return `<div class="none-found">No issues found.</div>`;
+  return list.map(i=>`
+    <div class="issue-item">
+      <span class="found">${escapeHtml(i.found_text||'')}</span> → <span class="suggest">${escapeHtml(i.suggestion||'')}</span>
+      ${i.context?`<div class="ctx">${escapeHtml(i.context)}</div>`:''}
+    </div>`).join('');
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+document.getElementById('print-btn').addEventListener('click', ()=>window.print());
+
+/* ================= measurement tool ================= */
+const canvas = document.getElementById('measure-canvas');
+const ctx = canvas.getContext('2d');
+const canvasWrap = document.getElementById('canvas-wrap');
+const unitSelect = document.getElementById('unit-select');
+const calibForm = document.getElementById('calib-form');
+const calibStatus = document.getElementById('calib-status');
+const areaFinishRow = document.getElementById('area-finish-row');
+const measureHint = document.getElementById('measure-hint');
+
+let scale = 1;               // canvas px per natural image px
+let pxPerMM = null;           // calibration
+let mode = null;              // 'calibrate' | 'length' | 'area'
+let pendingPoints = [];       // points collected for current action (canvas space)
+let shapes = [];              // saved {type, points, valueMM/valueMM2, color, label}
+const colorPalette = ['#1F4E5F','#B23A32','#2F6B4F','#B9812C','#6B4C9A','#2C7DA0'];
+let colorIdx = 0;
+
+function initCanvas(){
+  const maxW = Math.min(canvasWrap.clientWidth || 860, 860);
+  const targetW = Math.min(uploadedImage.naturalWidth, maxW);
+  scale = targetW / uploadedImage.naturalWidth;
+  canvas.width = Math.round(uploadedImage.naturalWidth * scale);
+  canvas.height = Math.round(uploadedImage.naturalHeight * scale);
+  canvas.style.width = canvas.width+'px';
+  canvas.style.height = canvas.height+'px';
+  pxPerMM = null;
+  shapes = [];
+  pendingPoints = [];
+  mode = null;
+  updateModeButtons();
+  updateCalibStatus();
+  renderMeasureList();
+  redraw();
+}
+
+function redraw(){
+  if(!uploadedImage) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.drawImage(uploadedImage,0,0,canvas.width,canvas.height);
+
+  shapes.forEach(s=>drawShape(s));
+
+  if(pendingPoints.length){
+    ctx.strokeStyle = '#1F4E5F';
+    ctx.fillStyle = '#1F4E5F';
+    ctx.lineWidth = 2;
+    if(mode==='area' && pendingPoints.length>1){
+      ctx.beginPath();
+      ctx.moveTo(pendingPoints[0].x, pendingPoints[0].y);
+      pendingPoints.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+      ctx.stroke();
+    } else if(pendingPoints.length===2){
+      ctx.beginPath();
+      ctx.moveTo(pendingPoints[0].x, pendingPoints[0].y);
+      ctx.lineTo(pendingPoints[1].x, pendingPoints[1].y);
+      ctx.stroke();
+    }
+    pendingPoints.forEach(p=>{
+      ctx.beginPath();ctx.arc(p.x,p.y,4,0,Math.PI*2);ctx.fill();
+    });
+  }
+}
+
+function drawShape(s){
+  ctx.strokeStyle = s.color;
+  ctx.fillStyle = s.color;
+  ctx.lineWidth = 2;
+  if(s.type==='length'){
+    ctx.beginPath();
+    ctx.moveTo(s.points[0].x, s.points[0].y);
+    ctx.lineTo(s.points[1].x, s.points[1].y);
+    ctx.stroke();
+    drawLabel(s.label, midpoint(s.points[0], s.points[1]), s.color);
+  } else if(s.type==='calibration'){
+    ctx.setLineDash([6,4]);
+    ctx.beginPath();
+    ctx.moveTo(s.points[0].x, s.points[0].y);
+    ctx.lineTo(s.points[1].x, s.points[1].y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    drawLabel('CAL: '+s.label, midpoint(s.points[0], s.points[1]), s.color);
+  } else if(s.type==='area'){
+    ctx.beginPath();
+    ctx.moveTo(s.points[0].x, s.points[0].y);
+    s.points.slice(1).forEach(p=>ctx.lineTo(p.x,p.y));
+    ctx.closePath();
+    ctx.globalAlpha = 0.12;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+    const cx = s.points.reduce((a,p)=>a+p.x,0)/s.points.length;
+    const cy = s.points.reduce((a,p)=>a+p.y,0)/s.points.length;
+    drawLabel(s.label, {x:cx,y:cy}, s.color);
+  }
+  s.points.forEach(p=>{ctx.beginPath();ctx.arc(p.x,p.y,3,0,Math.PI*2);ctx.fill();});
+}
+
+function drawLabel(text, pos, color){
+  ctx.font = '600 11px "IBM Plex Mono", monospace';
+  const padding = 4;
+  const w = ctx.measureText(text).width + padding*2;
+  ctx.fillStyle = '#fff';
+  ctx.globalAlpha = 0.85;
+  ctx.fillRect(pos.x - w/2, pos.y - 9, w, 16);
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(pos.x - w/2, pos.y - 9, w, 16);
+  ctx.fillStyle = color;
+  ctx.fillText(text, pos.x - w/2 + padding, pos.y + 3);
+}
+
+function midpoint(a,b){return {x:(a.x+b.x)/2, y:(a.y+b.y)/2};}
+
+function canvasPointFromEvent(e){
+  const rect = canvas.getBoundingClientRect();
+  const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0].clientX);
+  const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0].clientY);
+  return {
+    x: (clientX - rect.left) * (canvas.width/rect.width),
+    y: (clientY - rect.top) * (canvas.height/rect.height)
+  };
+}
+
+canvas.addEventListener('pointerdown', e=>{
+  if(!uploadedImage || !mode) return;
+  const pt = canvasPointFromEvent(e);
+  pendingPoints.push(pt);
+
+  if(mode==='calibrate' && pendingPoints.length===2){
+    openCalibForm();
+  } else if(mode==='length' && pendingPoints.length===2){
+    finalizeLength();
+  }
+  redraw();
+});
+
+/* ---- mode buttons ---- */
+document.querySelectorAll('.mode-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    if(!uploadedImage){ alert('Upload an artwork image first.'); return; }
+    if(mode===btn.dataset.mode){
+      mode=null; pendingPoints=[]; calibForm.style.display='none'; areaFinishRow.style.display='none';
+    } else {
+      mode = btn.dataset.mode;
+      pendingPoints=[];
+      calibForm.style.display='none';
+      areaFinishRow.style.display = mode==='area' ? 'flex' : 'none';
+      measureHint.textContent = mode==='calibrate'
+        ? 'Click two points along a length you know the real size of (e.g. a printed ruler mark, or a die-line dimension).'
+        : mode==='length'
+        ? 'Click a start point and an end point to measure a distance.'
+        : 'Click each corner of the area you want to measure, then press "Close shape & calculate".';
+    }
+    updateModeButtons();
+    redraw();
+  });
+});
+function updateModeButtons(){
+  document.querySelectorAll('.mode-btn').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+}
+
+/* ---- calibration ---- */
+function openCalibForm(){
+  calibForm.style.display='flex';
+  document.getElementById('calib-unit-label').textContent = unitSelect.value;
+  document.getElementById('calib-value').focus();
+}
+document.getElementById('calib-set-btn').addEventListener('click', ()=>{
+  const val = parseFloat(document.getElementById('calib-value').value);
+  if(!val || val<=0){ alert('Enter a valid positive length.'); return; }
+  const mm = toMM(val, unitSelect.value);
+  const pixelDist = dist(pendingPoints[0], pendingPoints[1]);
+  pxPerMM = pixelDist / mm;
+
+  shapes = shapes.filter(s=>s.type!=='calibration'); // keep only one calibration line visible
+  shapes.push({
+    type:'calibration', points:[...pendingPoints],
+    label: `${val} ${unitSelect.value}`, color:'#B9812C'
+  });
+
+  pendingPoints=[];
+  calibForm.style.display='none';
+  document.getElementById('calib-value').value='';
+  mode=null; updateModeButtons();
+  updateCalibStatus();
+  redraw();
+});
+document.getElementById('calib-cancel-btn').addEventListener('click', ()=>{
+  pendingPoints=[]; calibForm.style.display='none'; mode=null; updateModeButtons(); redraw();
+});
+function updateCalibStatus(){
+  if(pxPerMM){
+    calibStatus.textContent = `Calibrated · ${pxPerMM.toFixed(2)} canvas px = 1 mm`;
+    calibStatus.classList.add('ok');
+  } else {
+    calibStatus.textContent = 'Not calibrated yet — measurements will show in pixels only.';
+    calibStatus.classList.remove('ok');
+  }
+}
+
+/* ---- length measurement ---- */
+function finalizeLength(){
+  const pixelDist = dist(pendingPoints[0], pendingPoints[1]);
+  const color = nextColor();
+  let label, valueMM=null;
+  if(pxPerMM){
+    valueMM = pixelDist / pxPerMM;
+    label = formatLength(valueMM);
+  } else {
+    label = pixelDist.toFixed(0)+' px';
+  }
+  shapes.push({type:'length', points:[...pendingPoints], label, valueMM, color});
+  pendingPoints=[];
+  mode=null; updateModeButtons();
+  renderMeasureList();
+  redraw();
+}
+
+/* ---- area measurement ---- */
+document.getElementById('area-close-btn').addEventListener('click', ()=>{
+  if(pendingPoints.length<3){ alert('Click at least 3 points to form a shape.'); return; }
+  const areaPx = shoelaceArea(pendingPoints);
+  const color = nextColor();
+  let label, valueMM2=null;
+  if(pxPerMM){
+    valueMM2 = areaPx / (pxPerMM*pxPerMM);
+    label = formatArea(valueMM2);
+  } else {
+    label = areaPx.toFixed(0)+' px²';
+  }
+  shapes.push({type:'area', points:[...pendingPoints], label, valueMM2, color});
+  pendingPoints=[];
+  mode=null; updateModeButtons();
+  areaFinishRow.style.display='none';
+  renderMeasureList();
+  redraw();
+});
+document.getElementById('area-cancel-btn').addEventListener('click', ()=>{
+  pendingPoints=[]; mode=null; updateModeButtons(); areaFinishRow.style.display='none'; redraw();
+});
+
+document.getElementById('clear-measurements').addEventListener('click', ()=>{
+  shapes = shapes.filter(s=>s.type==='calibration');
+  renderMeasureList();
+  redraw();
+});
+
+unitSelect.addEventListener('change', ()=>{
+  document.getElementById('calib-unit-label').textContent = unitSelect.value;
+  renderMeasureList();
+});
+
+/* ---- helpers ---- */
+function dist(a,b){return Math.hypot(a.x-b.x, a.y-b.y);}
+function toMM(val, unit){
+  if(unit==='mm') return val;
+  if(unit==='cm') return val*10;
+  if(unit==='inch') return val*25.4;
+}
+function fromMM(mm, unit){
+  if(unit==='mm') return mm;
+  if(unit==='cm') return mm/10;
+  if(unit==='inch') return mm/25.4;
+}
+function formatLength(mm){
+  const u = unitSelect.value;
+  return fromMM(mm,u).toFixed(2)+' '+u;
+}
+function formatArea(mm2){
+  const u = unitSelect.value;
+  const factor = u==='mm' ? 1 : u==='cm' ? 100 : 645.16; // mm² per unit²
+  return (mm2/factor).toFixed(2)+' '+u+'\u00B2';
+}
+function shoelaceArea(pts){
+  let sum=0;
+  for(let i=0;i<pts.length;i++){
+    const p1=pts[i], p2=pts[(i+1)%pts.length];
+    sum += p1.x*p2.y - p2.x*p1.y;
+  }
+  return Math.abs(sum/2);
+}
+function nextColor(){
+  const c = colorPalette[colorIdx % colorPalette.length];
+  colorIdx++;
+  return c;
+}
+
+function renderMeasureList(){
+  const list = document.getElementById('measure-list');
+  const measurable = shapes.filter(s=>s.type!=='calibration');
+  if(!measurable.length){ list.innerHTML=''; return; }
+  list.innerHTML = measurable.map((s,i)=>{
+    let val = '—';
+    if(s.type==='length' && s.valueMM!=null) val = formatLength(s.valueMM);
+    else if(s.type==='area' && s.valueMM2!=null) val = formatArea(s.valueMM2);
+    else val = s.label;
+    return `<div class="measure-row">
+      <span class="swatch" style="background:${s.color};"></span>
+      ${s.type==='length'?'Length':'Area'} ${i+1}
+      <span class="val">${val}</span>
+    </div>`;
+  }).join('');
+}
+
+window.addEventListener('resize', ()=>{ /* fixed at load size for measurement consistency */ });
+</script>
+</body>
+</html>
