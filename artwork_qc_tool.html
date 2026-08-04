@@ -563,6 +563,7 @@ async function analyzeArtwork(){
       throw new Error(errBody.error || ('Request failed with status '+response.status));
     }
     const data = await response.json();
+    if(data.error){ throw new Error(data.error); }
     const textBlock = (data.content||[]).map(b=>b.text||"").join("\n");
     const clean = textBlock.replace(/```json/g,'').replace(/```/g,'').trim();
     const parsed = JSON.parse(clean);
