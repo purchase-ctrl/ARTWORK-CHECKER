@@ -26,7 +26,7 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
-        max_tokens: 1800,
+        max_tokens: 4000,
         messages: [
           {
             role: "user",
@@ -43,6 +43,13 @@ module.exports = async function handler(req, res) {
 
     if (!anthropicRes.ok) {
       res.status(anthropicRes.status).json({ error: data.error ? data.error.message : "Anthropic API request failed." });
+      return;
+    }
+
+    if (data.stop_reason === "max_tokens") {
+      res.status(200).json({
+        error: "The check found more to report than fit in one response and got cut off. Try again — if it keeps happening, the artwork may need to be checked in smaller sections."
+      });
       return;
     }
 
