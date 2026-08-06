@@ -170,13 +170,17 @@
   /* ---------- print ---------- */
   .no-print{}
   @media print{
+    @page{ margin: 18mm 15mm; }
     body{background:#fff;}
     .no-print{display:none !important;}
-    .app{max-width:100%;padding:0;}
-    #print-area{display:block !important;}
+    .app{max-width:100%;padding:0;margin:0;}
+    #print-area{display:block !important;padding:0 4mm;}
     .card{border:none;padding:0;margin-bottom:20px;}
-    table{page-break-inside:auto;}
+    table{page-break-inside:auto;width:100%;}
     tr{page-break-inside:avoid;}
+    th,td{padding:8px 6px;}
+    h2{page-break-after:avoid;}
+    .summary-strip{margin-bottom:10px;}
   }
 </style>
 </head>
