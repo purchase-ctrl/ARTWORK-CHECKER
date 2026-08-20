@@ -1,0 +1,61 @@
+module.exports = async function handler(req, res) {
+  if (req.method !== "POST") {
+    res.status(405).json({ error: "Method not allowed" });
+    return;
+  }
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    res.status(500).json({ error: "Server is missing ANTHROPIC_API_KEY. Add it in Vercel → Project → Settings → Environment Variables, then redeploy." });
+    return;
+  }
+
+  try {
+    const { imageA, imageB, prompt } = req.body || {};
+    if (!imageA || !imageB || !prompt) {
+      res.status(400).json({ error: "Missing imageA, imageB, or prompt in request body." });
+      return;
+    }
+
+    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 4000,
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "image", source: { type: "base64", media_type: imageA.mediaType, data: imageA.base64 } },
+              { type: "image", source: { type: "base64", media_type: imageB.mediaType, data: imageB.base64 } },
+              { type: "text", text: prompt }
+            ]
+          }
+        ]
+      })
+    });
+
+    const data = await anthropicRes.json();
+
+    if (!anthropicRes.ok) {
+      res.status(anthropicRes.status).json({ error: data.error ? data.error.message : "Anthropic API request failed." });
+      return;
+    }
+
+    if (data.stop_reason === "max_tokens") {
+      res.status(200).json({
+        error: "The comparison found more to report than fit in one response and got cut off. Try again."
+      });
+      return;
+    }
+
+    res.status(200).json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message || "Unexpected server error." });
+  }
+};
