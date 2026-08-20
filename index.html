@@ -175,6 +175,7 @@
     .no-print{display:none !important;}
     .app{max-width:100%;padding:0;margin:0;}
     #print-area{display:block !important;padding:0 4mm;}
+    .printable{display:block !important;padding:0 4mm;}
     .card{border:none;padding:0;margin-bottom:20px;}
     table{page-break-inside:auto;width:100%;}
     tr{page-break-inside:avoid;}
@@ -220,6 +221,7 @@
   <nav class="tabs no-print">
     <button class="tab-btn active" data-tab="compliance">01 · Compliance Check</button>
     <button class="tab-btn" data-tab="measure">02 · Measurement Tool</button>
+    <button class="tab-btn" data-tab="compare">03 · Compare Artworks</button>
   </nav>
 
   <!-- ============ COMPLIANCE TAB ============ -->
@@ -254,24 +256,33 @@
         <div class="summary-strip" id="summary-strip"></div>
         <div class="summary-text" id="summary-text"></div>
 
-        <h2><span class="n">A</span>Checklist</h2>
+        <h2><span class="n" id="checklist-letter">A</span>Checklist</h2>
         <table>
           <thead><tr><th style="width:34%;">Requirement</th><th style="width:14%;">Status</th><th>Note</th></tr></thead>
           <tbody id="checklist-body"></tbody>
         </table>
 
         <div id="crosscheck-section" style="display:none;">
-          <h2 style="margin-top:18px;"><span class="n">B</span>Ingredient &amp; shelf-life cross-check</h2>
+          <h2 style="margin-top:18px;"><span class="n" id="crosscheck-letter">B</span>Ingredient &amp; shelf-life cross-check</h2>
           <table>
             <thead><tr><th style="width:34%;">Against spreadsheet</th><th style="width:14%;">Status</th><th>Note</th></tr></thead>
             <tbody id="crosscheck-body"></tbody>
           </table>
         </div>
 
-        <h2 style="margin-top:18px;"><span class="n" id="spelling-letter">C</span>Spelling issues</h2>
+        <div id="ingredient-spell-section" style="display:none;">
+          <h2 style="margin-top:18px;"><span class="n" id="ingredient-spell-letter">C</span>Ingredient spelling check</h2>
+          <table>
+            <thead><tr><th style="width:34%;">Ingredient as printed</th><th style="width:14%;">Status</th><th>Note</th></tr></thead>
+            <tbody id="ingredient-spell-body"></tbody>
+          </table>
+          <div class="hint" id="ingredient-spell-hint" style="display:none;"></div>
+        </div>
+
+        <h2 style="margin-top:18px;"><span class="n" id="spelling-letter">D</span>Spelling issues</h2>
         <div id="spelling-list"></div>
 
-        <h2 style="margin-top:18px;"><span class="n" id="grammar-letter">D</span>Grammar issues</h2>
+        <h2 style="margin-top:18px;"><span class="n" id="grammar-letter">E</span>Grammar issues</h2>
         <div id="grammar-list"></div>
       </div>
       <div class="btn-row no-print" style="margin-top:-6px;">
@@ -313,6 +324,72 @@
       <div class="calib-status" id="calib-status">Upload as a PDF for automatic mm scale, or use "Calibrate" for images.</div>
 
       <div class="measure-list" id="measure-list"></div>
+    </div>
+  </section>
+
+  <!-- ============ COMPARE TAB ============ -->
+  <section class="tab-panel" id="tab-compare">
+    <div class="card no-print">
+      <h2><span class="n">→</span>Compare two artwork versions</h2>
+      <div class="btn-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div class="dropzone" id="compare-dropzone-a" style="padding:16px;">
+            <div class="dz-title">Previous artwork</div>
+            <div class="dz-sub">Tap to choose · PNG / JPG / WEBP / PDF</div>
+          </div>
+          <input type="file" id="compare-file-a" accept="image/*,application/pdf" style="display:none;">
+          <div class="file-row" id="compare-file-row-a" style="display:none;">
+            <img id="compare-thumb-a" alt="">
+            <div>
+              <div class="file-name" id="compare-name-a"></div>
+              <div class="file-meta" id="compare-meta-a"></div>
+            </div>
+          </div>
+        </div>
+        <div style="flex:1;min-width:220px;">
+          <div class="dropzone" id="compare-dropzone-b" style="padding:16px;">
+            <div class="dz-title">New artwork</div>
+            <div class="dz-sub">Tap to choose · PNG / JPG / WEBP / PDF</div>
+          </div>
+          <input type="file" id="compare-file-b" accept="image/*,application/pdf" style="display:none;">
+          <div class="file-row" id="compare-file-row-b" style="display:none;">
+            <img id="compare-thumb-b" alt="">
+            <div>
+              <div class="file-name" id="compare-name-b"></div>
+              <div class="file-meta" id="compare-meta-b"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:14px;">
+        <button id="compare-btn" disabled>Compare Artworks</button>
+        <span class="hint" id="compare-hint">Upload both artworks first.</span>
+      </div>
+      <div id="compare-loading-box"></div>
+    </div>
+
+    <div id="compare-results-wrap" style="display:none;">
+      <div class="card printable">
+        <div class="report-meta" id="compare-report-meta"></div>
+        <h2 style="font-size:17px;">Artwork Comparison Report</h2>
+        <div class="summary-text" id="compare-summary-text"></div>
+
+        <h2><span class="n">A</span>Size comparison</h2>
+        <table>
+          <thead><tr><th>Previous</th><th>New</th><th>Status</th></tr></thead>
+          <tbody id="compare-size-body"></tbody>
+        </table>
+        <div class="hint" id="compare-size-hint" style="display:none;"></div>
+
+        <h2 style="margin-top:18px;"><span class="n">B</span>Detail differences</h2>
+        <table>
+          <thead><tr><th style="width:22%;">Field</th><th style="width:32%;">Previous</th><th style="width:32%;">New</th><th>Change</th></tr></thead>
+          <tbody id="compare-diff-body"></tbody>
+        </table>
+      </div>
+      <div class="btn-row no-print" style="margin-top:-6px;">
+        <button id="compare-print-btn" class="secondary">Print Report</button>
+      </div>
     </div>
   </section>
 
@@ -505,7 +582,11 @@ Using that reference data, cross-check two things against what is printed on the
   return `You are a meticulous packaging/label quality-control inspector for a cosmetics manufacturer. Examine the attached artwork image closely (zoom into small print mentally) and evaluate it against this mandatory checklist:
 ${rulesText}
 
-Also proofread every piece of visible text on the artwork for spelling mistakes and grammar mistakes (wrong articles, tense, punctuation, awkward phrasing, inconsistent capitalization of mandatory legal text, etc). Do not flag brand names, coined product names, or intentional stylization as errors.${crossCheckBlock}
+Also proofread every piece of visible text on the artwork for spelling mistakes and grammar mistakes (wrong articles, tense, punctuation, awkward phrasing, inconsistent capitalization of mandatory legal text, etc). Do not flag brand names, coined product names, or intentional stylization as errors.
+
+Separately, find the ingredients / composition list printed on the artwork (often headed "Ingredients", "Composition", or similar) and transcribe it as a clean array of individual ingredient names, exactly as printed (one entry per ingredient, preserving the printed spelling — do not correct anything here, that happens elsewhere).
+
+Also find the "Marketed By" address on the artwork and transcribe just the address portion (street/plot, area, city, state, PIN — not the company name) exactly as printed, so it can be checked against a mapping service. If no Marketed By address is visible, leave this as an empty string.${crossCheckBlock}
 
 Respond with ONLY raw JSON (no markdown code fences, no commentary before or after), exactly in this shape:
 {
@@ -518,9 +599,11 @@ Respond with ONLY raw JSON (no markdown code fences, no commentary before or aft
   "grammar_errors": [
     {"found_text": "<exact text as printed>", "suggestion": "<corrected text>", "context": "<short surrounding context>"}
   ],
+  "ingredients_printed": ["<ingredient 1 exactly as printed>", "<ingredient 2>", "..."],
+  "marketed_by_address": "<address portion only, exactly as printed, or empty string if none visible>",
   "overall_summary": "<2-3 sentence plain-language summary of the artwork's compliance state and biggest issues, or confirmation it looks clean>"${jsonKeysBlock}
 }
-Include one checklist entry per rule listed above, in the same order. If a field cannot be verified from the image, use status "unclear" and say why in the note. If there are no spelling or grammar errors, return empty arrays for those.`;
+Include one checklist entry per rule listed above, in the same order. If a field cannot be verified from the image, use status "unclear" and say why in the note. If there are no spelling or grammar errors, return empty arrays for those. If no ingredients list is visible on the artwork, return an empty array for ingredients_printed.`;
 }
 
 async function lookupFormulation(code){
@@ -571,6 +654,26 @@ async function analyzeArtwork(){
     const textBlock = (data.content||[]).map(b=>b.text||"").join("\n");
     const clean = textBlock.replace(/```json/g,'').replace(/```/g,'').trim();
     const parsed = JSON.parse(clean);
+
+    if(parsed.ingredients_printed && parsed.ingredients_printed.length){
+      loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Checking ingredient spelling against your approved list…</div>`;
+      try{
+        const approved = await fetchApprovedIngredients();
+        parsed.ingredient_spelling_results = matchIngredients(parsed.ingredients_printed, approved);
+      }catch(err){
+        parsed.ingredient_spelling_error = err.message;
+      }
+    }
+
+    if(parsed.marketed_by_address && parsed.marketed_by_address.trim()){
+      loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Checking the Marketed By address against Google…</div>`;
+      try{
+        parsed.address_verification = await verifyAddress(parsed.marketed_by_address.trim());
+      }catch(err){
+        parsed.address_verification_error = err.message;
+      }
+    }
+
     renderResults(parsed);
     loadingBox.innerHTML = '';
   }catch(err){
@@ -579,6 +682,68 @@ async function analyzeArtwork(){
   }finally{
     analyzeBtn.disabled = false;
   }
+}
+
+async function verifyAddress(address){
+  const res = await fetch("/api/verify-address", {
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body: JSON.stringify({ address })
+  });
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.error){
+    throw new Error(data.error || 'Could not verify the address.');
+  }
+  return data;
+}
+
+async function fetchApprovedIngredients(){
+  const res = await fetch("/api/ingredient-list");
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok || data.error){
+    throw new Error(data.error || 'Could not load the approved ingredient list.');
+  }
+  return data.ingredients || [];
+}
+
+function normalizeIngredient(s){
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+}
+
+function levenshtein(a,b){
+  const m=a.length, n=b.length;
+  const dp = [];
+  for(let i=0;i<=m;i++){ dp.push(new Array(n+1).fill(0)); dp[i][0]=i; }
+  for(let j=0;j<=n;j++) dp[0][j]=j;
+  for(let i=1;i<=m;i++){
+    for(let j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function matchIngredients(printedList, approvedList){
+  const approvedNorm = approvedList.map(a=>({raw:a, norm:normalizeIngredient(a)}));
+  return printedList.map(printed=>{
+    const norm = normalizeIngredient(printed);
+    if(!norm) return {printed, status:'unclear', note:'Empty entry.'};
+
+    const exact = approvedNorm.find(a=>a.norm===norm);
+    if(exact) return {printed, status:'pass', note:'Matches the approved list.'};
+
+    let best=null, bestDist=Infinity;
+    approvedNorm.forEach(a=>{
+      if(Math.abs(a.norm.length - norm.length) > 3) return;
+      const d = levenshtein(norm, a.norm);
+      if(d<bestDist){ bestDist=d; best=a; }
+    });
+    const threshold = Math.max(1, Math.round(norm.length*0.2));
+    if(best && bestDist<=threshold){
+      return {printed, status:'fail', note:`Possible misspelling — closest approved match: "${best.raw}".`};
+    }
+    return {printed, status:'unclear', note:'Not found in the approved ingredient list — verify manually.'};
+  });
 }
 
 function renderResults(parsed){
@@ -598,6 +763,10 @@ function renderResults(parsed){
   const hasCrossCheck = !!(parsed.ingredient_check || parsed.shelf_life_check);
   const crossFailCount = [parsed.ingredient_check, parsed.shelf_life_check].filter(c=>c && c.status==='fail').length;
 
+  const spellResults = parsed.ingredient_spelling_results || null;
+  const hasIngredientSpellCheck = !!(spellResults && spellResults.length) || !!parsed.ingredient_spelling_error;
+  const ingredientFailCount = spellResults ? spellResults.filter(r=>r.status==='fail').length : 0;
+
   document.getElementById('summary-strip').innerHTML = `
     <span class="pill pass">${passCount} passed</span>
     <span class="pill fail">${failCount} failed</span>
@@ -605,6 +774,7 @@ function renderResults(parsed){
     <span class="pill ${spellCount?'fail':'pass'}">${spellCount} spelling issue${spellCount===1?'':'s'}</span>
     <span class="pill ${grammarCount?'fail':'pass'}">${grammarCount} grammar issue${grammarCount===1?'':'s'}</span>
     ${hasCrossCheck ? `<span class="pill ${crossFailCount?'fail':'pass'}">${crossFailCount} spreadsheet mismatch${crossFailCount===1?'':'es'}</span>` : ''}
+    ${spellResults ? `<span class="pill ${ingredientFailCount?'fail':'pass'}">${ingredientFailCount} ingredient spelling issue${ingredientFailCount===1?'':'s'}</span>` : ''}
   `;
   document.getElementById('summary-text').textContent = parsed.overall_summary || '';
 
@@ -618,6 +788,21 @@ function renderResults(parsed){
       <td>${escapeHtml(row.note||'')}</td>`;
     body.appendChild(tr);
   });
+  if(parsed.address_verification){
+    const av = parsed.address_verification;
+    const tr = document.createElement('tr');
+    const statusClass = av.status==='pass'?'pass':av.status==='fail'?'fail':'unclear';
+    tr.innerHTML = `<td>Marketed By — address verified (Google)</td>
+      <td><span class="status-badge ${statusClass}">${(av.status||'unclear').toUpperCase()}</span></td>
+      <td>${escapeHtml(av.note||'')}</td>`;
+    body.appendChild(tr);
+  } else if(parsed.address_verification_error){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>Marketed By — address verified (Google)</td>
+      <td><span class="status-badge unclear">UNCLEAR</span></td>
+      <td>${escapeHtml(parsed.address_verification_error)}</td>`;
+    body.appendChild(tr);
+  }
 
   const crossSection = document.getElementById('crosscheck-section');
   const crossBody = document.getElementById('crosscheck-body');
@@ -639,8 +824,41 @@ function renderResults(parsed){
   } else {
     crossSection.style.display='none';
   }
-  document.getElementById('spelling-letter').textContent = hasCrossCheck ? 'C' : 'B';
-  document.getElementById('grammar-letter').textContent = hasCrossCheck ? 'D' : 'C';
+
+  const ingredientSection = document.getElementById('ingredient-spell-section');
+  const ingredientBody = document.getElementById('ingredient-spell-body');
+  const ingredientHint = document.getElementById('ingredient-spell-hint');
+  ingredientBody.innerHTML='';
+  ingredientHint.style.display='none';
+  if(hasIngredientSpellCheck){
+    ingredientSection.style.display='block';
+    if(spellResults){
+      spellResults.forEach(r=>{
+        const tr = document.createElement('tr');
+        const statusClass = r.status==='pass'?'pass':r.status==='fail'?'fail':'unclear';
+        tr.innerHTML = `<td>${escapeHtml(r.printed||'')}</td>
+          <td><span class="status-badge ${statusClass}">${(r.status||'unclear').toUpperCase()}</span></td>
+          <td>${escapeHtml(r.note||'')}</td>`;
+        ingredientBody.appendChild(tr);
+      });
+    }
+    if(parsed.ingredient_spelling_error){
+      ingredientHint.style.display='block';
+      ingredientHint.textContent = 'Ingredient spelling check unavailable: ' + parsed.ingredient_spelling_error;
+    }
+  } else {
+    ingredientSection.style.display='none';
+  }
+
+  // Assign section letters in document order, skipping hidden sections.
+  const letterSpans = [
+    document.getElementById('checklist-letter'),
+    hasCrossCheck ? document.getElementById('crosscheck-letter') : null,
+    hasIngredientSpellCheck ? document.getElementById('ingredient-spell-letter') : null,
+    document.getElementById('spelling-letter'),
+    document.getElementById('grammar-letter')
+  ].filter(Boolean);
+  letterSpans.forEach((el,i)=>{ el.textContent = String.fromCharCode(65+i); });
 
   document.getElementById('spelling-list').innerHTML = renderIssues(parsed.spelling_errors);
   document.getElementById('grammar-list').innerHTML = renderIssues(parsed.grammar_errors);
@@ -969,6 +1187,210 @@ function renderMeasureList(){
 }
 
 window.addEventListener('resize', ()=>{ /* fixed at load size for measurement consistency */ });
+
+/* ================= compare artworks ================= */
+let compareFileA = null;
+let compareFileB = null;
+
+async function processFile(file){
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  const isImage = file.type.startsWith('image/');
+  if(!isPdf && !isImage){
+    throw new Error('Please upload an image (PNG, JPG, WEBP) or a PDF.');
+  }
+
+  if(isImage){
+    const dataUrl = await new Promise((resolve,reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=>resolve(reader.result);
+      reader.onerror = ()=>reject(new Error('Could not read that file.'));
+      reader.readAsDataURL(file);
+    });
+    return { dataUrl, mediaType: file.type, name: file.name, size: file.size, sourcePxPerMM: null };
+  }
+
+  // PDF — render page 1 at the same fixed scale used elsewhere, so mm math stays consistent.
+  const arrayBuffer = await new Promise((resolve,reject)=>{
+    const reader = new FileReader();
+    reader.onload = ()=>resolve(reader.result);
+    reader.onerror = ()=>reject(new Error('Could not read that PDF.'));
+    reader.readAsArrayBuffer(file);
+  });
+  const pdfDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer)}).promise;
+  const page = await pdfDoc.getPage(1);
+  const viewport = page.getViewport({scale: PDF_RENDER_SCALE});
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width = viewport.width;
+  tmpCanvas.height = viewport.height;
+  await page.render({canvasContext: tmpCanvas.getContext('2d'), viewport}).promise;
+  const dataUrl = tmpCanvas.toDataURL('image/png');
+  const approxSize = Math.round(dataUrl.length * 0.75);
+  const sourcePxPerMM = PDF_RENDER_SCALE * 72 / 25.4;
+  return {
+    dataUrl, mediaType: 'image/png',
+    name: file.name + (pdfDoc.numPages>1 ? ' (page 1)' : ''),
+    size: approxSize, sourcePxPerMM
+  };
+}
+
+function wireCompareDropzone(dzId, inputId, which){
+  const dz = document.getElementById(dzId);
+  const input = document.getElementById(inputId);
+  dz.addEventListener('click', ()=>input.click());
+  dz.addEventListener('dragover', e=>{ e.preventDefault(); dz.classList.add('drag'); });
+  dz.addEventListener('dragleave', ()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop', e=>{
+    e.preventDefault(); dz.classList.remove('drag');
+    if(e.dataTransfer.files[0]) handleCompareFile(e.dataTransfer.files[0], which);
+  });
+  input.addEventListener('change', e=>{
+    if(e.target.files[0]) handleCompareFile(e.target.files[0], which);
+  });
+}
+wireCompareDropzone('compare-dropzone-a','compare-file-a','a');
+wireCompareDropzone('compare-dropzone-b','compare-file-b','b');
+
+async function handleCompareFile(file, which){
+  try{
+    const processed = await processFile(file);
+    if(which==='a') compareFileA = processed; else compareFileB = processed;
+    document.getElementById('compare-thumb-'+which).src = processed.dataUrl;
+    document.getElementById('compare-name-'+which).textContent = processed.name;
+    document.getElementById('compare-meta-'+which).textContent = (processed.size/1024).toFixed(0)+' KB · '+processed.mediaType;
+    document.getElementById('compare-file-row-'+which).style.display='flex';
+    document.getElementById('compare-dropzone-'+which).style.display='none';
+    document.getElementById('compare-results-wrap').style.display='none';
+    updateCompareButton();
+  }catch(err){
+    alert(err.message || 'Could not read that file.');
+  }
+}
+
+function updateCompareButton(){
+  const btn = document.getElementById('compare-btn');
+  const hint = document.getElementById('compare-hint');
+  if(compareFileA && compareFileB){
+    btn.disabled = false;
+    hint.textContent = 'Ready to compare.';
+  } else {
+    btn.disabled = true;
+    hint.textContent = 'Upload both artworks first.';
+  }
+}
+
+document.getElementById('compare-btn').addEventListener('click', runCompare);
+document.getElementById('compare-print-btn').addEventListener('click', ()=>window.print());
+
+function buildComparePrompt(){
+  return `You are comparing two versions of the same packaging artwork for a cosmetics manufacturer: the FIRST image is the PREVIOUS approved artwork, the SECOND image is the NEW artwork being submitted. Carefully compare all visible printed content between them — checklist fields (batch no., mfg date, MRP, expiry/use-before wording, Mfd. By statement, M.L. No., Marketed By, customer care details, net content, ingredients list, EAN/barcode), plus any other text, layout, or visual differences you notice (colors, imagery, headings, claims, etc).
+
+Respond with ONLY raw JSON (no markdown fences, no commentary), exactly in this shape:
+{
+  "differences": [
+    {"field": "<what this difference is about>", "previous": "<value or description in the previous artwork>", "new": "<value or description in the new artwork>", "change_type": "added" | "removed" | "modified"}
+  ],
+  "dimension_note": "<any visually obvious size/proportion/layout difference you notice between the two, purely a visual observation — do not invent exact measurements>",
+  "summary": "<2-3 sentence plain-language summary of what changed between the two artworks, or confirmation there are no meaningful differences>"
+}
+Only list fields that actually changed — if a field is identical, leave it out of "differences" entirely. If the two artworks are identical in content, return an empty differences array and say so in the summary.`;
+}
+
+async function runCompare(){
+  const btn = document.getElementById('compare-btn');
+  btn.disabled = true;
+  const loadingBox = document.getElementById('compare-loading-box');
+  document.getElementById('compare-results-wrap').style.display='none';
+  loadingBox.innerHTML = `<div class="loading"><div class="spinner"></div>Comparing both artworks…</div>`;
+
+  try{
+    const base64A = compareFileA.dataUrl.split(',')[1];
+    const base64B = compareFileB.dataUrl.split(',')[1];
+    const response = await fetch("/api/compare", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        imageA: { base64: base64A, mediaType: compareFileA.mediaType },
+        imageB: { base64: base64B, mediaType: compareFileB.mediaType },
+        prompt: buildComparePrompt()
+      })
+    });
+    const data = await response.json();
+    if(data.error){ throw new Error(data.error); }
+    if(!response.ok){ throw new Error('Request failed with status '+response.status); }
+    const textBlock = (data.content||[]).map(b=>b.text||"").join("\n");
+    const clean = textBlock.replace(/```json/g,'').replace(/```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    renderCompareResults(parsed);
+    loadingBox.innerHTML='';
+  }catch(err){
+    console.error(err);
+    loadingBox.innerHTML = `<div class="error-box">Couldn't complete the comparison: ${escapeHtml(err.message||'unknown error')}.</div>`;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+function loadImageDims(dataUrl){
+  return new Promise(resolve=>{
+    const img = new Image();
+    img.onload = ()=>resolve({w:img.naturalWidth, h:img.naturalHeight});
+    img.src = dataUrl;
+  });
+}
+
+async function renderCompareResults(parsed){
+  const wrap = document.getElementById('compare-results-wrap');
+  wrap.style.display='block';
+  document.getElementById('compare-report-meta').textContent =
+    `Previous: ${compareFileA.name}  ·  New: ${compareFileB.name}  ·  Compared: ${new Date().toLocaleString()}`;
+  document.getElementById('compare-summary-text').textContent = parsed.summary || '';
+
+  const sizeBody = document.getElementById('compare-size-body');
+  const sizeHint = document.getElementById('compare-size-hint');
+  sizeBody.innerHTML='';
+  sizeHint.style.display='none';
+
+  if(compareFileA.sourcePxPerMM && compareFileB.sourcePxPerMM){
+    const [dimsA, dimsB] = await Promise.all([loadImageDims(compareFileA.dataUrl), loadImageDims(compareFileB.dataUrl)]);
+    const wA = dimsA.w / compareFileA.sourcePxPerMM, hA = dimsA.h / compareFileA.sourcePxPerMM;
+    const wB = dimsB.w / compareFileB.sourcePxPerMM, hB = dimsB.h / compareFileB.sourcePxPerMM;
+    const tolerance = 0.5; // mm
+    const match = Math.abs(wA-wB)<=tolerance && Math.abs(hA-hB)<=tolerance;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${wA.toFixed(2)} × ${hA.toFixed(2)} mm</td>
+      <td>${wB.toFixed(2)} × ${hB.toFixed(2)} mm</td>
+      <td><span class="status-badge ${match?'pass':'fail'}">${match?'MATCH':'DIFFERENT'}</span></td>`;
+    sizeBody.appendChild(tr);
+  } else {
+    sizeHint.style.display='block';
+    sizeHint.textContent = 'Exact size comparison needs both files uploaded as PDFs (which carry real physical page dimensions). At least one of these was a plain image, so only printed content was compared below, not exact size.';
+  }
+
+  if(parsed.dimension_note){
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="3" style="color:var(--ink-soft);font-style:italic;">${escapeHtml(parsed.dimension_note)}</td>`;
+    sizeBody.appendChild(tr);
+  }
+
+  const diffBody = document.getElementById('compare-diff-body');
+  diffBody.innerHTML='';
+  const diffs = parsed.differences || [];
+  if(!diffs.length){
+    diffBody.innerHTML = `<tr><td colspan="4" class="none-found">No content differences found.</td></tr>`;
+  } else {
+    diffs.forEach(d=>{
+      const tr = document.createElement('tr');
+      const badgeClass = d.change_type==='added' ? 'pass' : d.change_type==='removed' ? 'fail' : 'unclear';
+      tr.innerHTML = `<td>${escapeHtml(d.field||'')}</td>
+        <td>${escapeHtml(d.previous||'—')}</td>
+        <td>${escapeHtml(d.new||'—')}</td>
+        <td><span class="status-badge ${badgeClass}">${(d.change_type||'modified').toUpperCase()}</span></td>`;
+      diffBody.appendChild(tr);
+    });
+  }
+
+  wrap.scrollIntoView({behavior:'smooth', block:'start'});
+}
 </script>
 </body>
 </html>

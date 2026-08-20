@@ -47,3 +47,66 @@ Google Cloud service-account version instead, just ask.
 
 That's it — the compliance check calls `/api/analyze` and, when a formulation
 code is entered, `/api/sheet-lookup` first, both on your own domain.
+
+## Ingredient spelling check (optional)
+
+The compliance check can also flag misspelled ingredients against a master
+list you control — no live API needed.
+
+1. In the same Google Sheet, add a new tab named exactly **Approved Ingredients**.
+2. Put one ingredient/INCI name per row in column A. A header in row 1 (e.g. "INCI Name") is fine and gets skipped automatically.
+3. To seed this list with the official EU standard: go to the European
+   Commission's CosIng database (search "EU CosIng database" — it's the
+   official, free source INCI names come from), use its "download a specific
+   list" / export option to get the ingredient names, and paste that column
+   into your "Approved Ingredients" tab. You can also just add your own
+   ingredients by hand — the tab is entirely yours to maintain.
+4. Redeploy the Apps Script (Deploy → Manage deployments → ✏️ → New version →
+   Deploy) so it picks up the new `action=ingredients` support — this file
+   already includes it, you just need the sheet tab to exist.
+
+No other setup needed — the same `GOOGLE_SHEET_WEBAPP_URL` and
+`SHEET_SHARED_SECRET` env vars already in Vercel cover this too. Every
+compliance check will now also compare the printed ingredient list against
+this tab, flagging anything that doesn't match closely (with the closest
+correct spelling suggested) — in addition to the per-formulation ingredient
+check that runs when a formulation code is entered.
+
+## Marketed By address verification (optional)
+
+The compliance check can also verify the printed "Marketed By" address is a
+real address, using Google's Geocoding API — a separate setup from the
+Sheets connection above.
+
+1. Go to https://console.cloud.google.com (same or different project as before — doesn't matter).
+2. **APIs & Services → Library** → search "Geocoding API" → **Enable**.
+3. Billing must be enabled on the project for this API (Google requires a
+   billing account even though there's a free monthly credit covering
+   roughly 40,000 lookups — far more than a label-checking tool will use).
+   **Billing → Link a billing account**, add a card if you don't have one linked yet.
+4. **APIs & Services → Credentials → Create Credentials → API key**.
+5. Click into the new key → **Restrict key** → under "API restrictions" choose
+   **Restrict key** and select only **Geocoding API** (keeps the key safe
+   even though it lives server-side).
+6. In Vercel → Settings → Environment Variables, add:
+   - `GOOGLE_MAPS_API_KEY` = the key you just created
+7. Redeploy.
+
+Every compliance check now transcribes the Marketed By address and checks it
+against Google Maps, adding a row to the checklist table:
+- **PASS** — the exact address was found (rooftop-level match).
+- **UNCLEAR** — Google only matched the general area (e.g. the city), not
+  the specific address — worth a manual look.
+- **FAIL** — Google couldn't find the address at all.
+
+## Compare Artworks (tab 03)
+
+Upload a previous and a new version of the same artwork and it will:
+- Compare exact physical size (only possible when both files are PDFs, since
+  only PDFs carry real physical dimensions — a plain image comparison shows
+  a note explaining this instead of a false measurement).
+- Compare all printed content (checklist fields, ingredients, any other
+  text) and list every difference found, labeled added / removed / modified.
+
+No extra setup needed — it reuses `ANTHROPIC_API_KEY` via a new
+`api/compare.js` endpoint. Multi-page PDFs use page 1 for comparison.
