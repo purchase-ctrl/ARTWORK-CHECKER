@@ -1,3 +1,28 @@
+function sleep(ms){ return new Promise(resolve => setTimeout(resolve, ms)); }
+
+async function callGeminiWithRetry(url, body, maxAttempts) {
+  let lastRes, lastData;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const geminiRes = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await geminiRes.json();
+
+    const isOverloaded = geminiRes.status === 503 ||
+      (data.error && /overloaded|high demand|try again/i.test(data.error.message || ""));
+
+    if (geminiRes.ok || !isOverloaded || attempt === maxAttempts) {
+      return { geminiRes, data };
+    }
+
+    lastRes = geminiRes; lastData = data;
+    await sleep(attempt * 1500); // 1.5s, then 3s
+  }
+  return { geminiRes: lastRes, data: lastData };
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.status(405).json({ error: "Method not allowed" });
@@ -20,29 +45,27 @@ module.exports = async function handler(req, res) {
     const model = "gemini-3.6-flash";
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-    const geminiRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { inline_data: { mime_type: mediaType, data: imageBase64 } },
-              { text: prompt }
-            ]
-          }
-        ],
-        generationConfig: {
-          maxOutputTokens: 4000,
-          responseMimeType: "application/json"
+    const { geminiRes, data } = await callGeminiWithRetry(url, {
+      contents: [
+        {
+          parts: [
+            { inline_data: { mime_type: mediaType, data: imageBase64 } },
+            { text: prompt }
+          ]
         }
-      })
-    });
-
-    const data = await geminiRes.json();
+      ],
+      generationConfig: {
+        maxOutputTokens: 4000,
+        responseMimeType: "application/json"
+      }
+    }, 3);
 
     if (!geminiRes.ok) {
-      res.status(geminiRes.status).json({ error: data.error ? data.error.message : "Gemini API request failed." });
+      const message = data.error ? data.error.message : "Gemini API request failed.";
+      const friendly = /overloaded|high demand/i.test(message)
+        ? "Gemini's free tier is under heavy demand right now, even after a few automatic retries. Please wait a minute and try again."
+        : message;
+      res.status(geminiRes.status).json({ error: friendly });
       return;
     }
 
