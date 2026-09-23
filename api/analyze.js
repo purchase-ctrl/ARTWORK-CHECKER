@@ -4,9 +4,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    res.status(500).json({ error: "Server is missing ANTHROPIC_API_KEY. Add it in Vercel → Project → Settings → Environment Variables, then redeploy." });
+    res.status(500).json({ error: "Server is missing GEMINI_API_KEY. Add it in Vercel → Project → Settings → Environment Variables, then redeploy." });
     return;
   }
 
@@ -17,43 +17,52 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const anthropicRes = await fetch("https://api.anthropic.com/v1/messages", {
+    const model = "gemini-2.5-flash";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const geminiRes = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01"
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4000,
-        messages: [
+        contents: [
           {
-            role: "user",
-            content: [
-              { type: "image", source: { type: "base64", media_type: mediaType, data: imageBase64 } },
-              { type: "text", text: prompt }
+            parts: [
+              { inline_data: { mime_type: mediaType, data: imageBase64 } },
+              { text: prompt }
             ]
           }
-        ]
+        ],
+        generationConfig: {
+          maxOutputTokens: 4000,
+          responseMimeType: "application/json"
+        }
       })
     });
 
-    const data = await anthropicRes.json();
+    const data = await geminiRes.json();
 
-    if (!anthropicRes.ok) {
-      res.status(anthropicRes.status).json({ error: data.error ? data.error.message : "Anthropic API request failed." });
+    if (!geminiRes.ok) {
+      res.status(geminiRes.status).json({ error: data.error ? data.error.message : "Gemini API request failed." });
       return;
     }
 
-    if (data.stop_reason === "max_tokens") {
+    const candidate = data.candidates && data.candidates[0];
+    if (!candidate) {
+      res.status(200).json({ error: "Gemini returned no result — the image may have been blocked by a safety filter, or the request failed silently." });
+      return;
+    }
+
+    if (candidate.finishReason === "MAX_TOKENS") {
       res.status(200).json({
         error: "The check found more to report than fit in one response and got cut off. Try again — if it keeps happening, the artwork may need to be checked in smaller sections."
       });
       return;
     }
 
-    res.status(200).json(data);
+    const text = ((candidate.content && candidate.content.parts) || []).map(p => p.text || "").join("");
+
+    // Normalize to the same shape the frontend already expects (mirrors the old Anthropic response shape).
+    res.status(200).json({ content: [{ type: "text", text }] });
   } catch (err) {
     res.status(500).json({ error: err.message || "Unexpected server error." });
   }
