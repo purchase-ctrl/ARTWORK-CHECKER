@@ -465,16 +465,7 @@
       </div>
 
       <div class="card printable">
-        <h2 style="font-size:17px;"><span class="n">B</span>Job Operation</h2>
-        <div class="jc-grid">
-          <div class="jc-field"><label>Colours — CMYK</label><input type="text" id="jc-colors" placeholder="e.g. 4C (CMYK)"></div>
-          <div class="jc-field"><label>Special Colours (Pantone No.)</label><input type="text" id="jc-pantone" placeholder="e.g. PMS 1375C"></div>
-        </div>
-        <p class="hint" style="margin-top:8px;">Filled in automatically from the artwork after you run a Compliance Check on tab 01 — edit if needed.</p>
-      </div>
-
-      <div class="card printable">
-        <h2 style="font-size:17px;"><span class="n">C</span>Finishing</h2>
+        <h2 style="font-size:17px;"><span class="n">B</span>Finishing</h2>
         <div class="jc-grid">
           <div class="jc-field">
             <label>Lamination</label>
@@ -740,9 +731,7 @@ Separately, find the ingredients / composition list printed on the artwork (ofte
 
 Also find the "Marketed By" address on the artwork and transcribe just the address portion (street/plot, area, city, state, PIN — not the company name) exactly as printed, so it can be checked against a mapping service. If no Marketed By address is visible, leave this as an empty string.
 
-Also identify the brand/customer name (the brand this product is sold under — usually the most prominent name on the front of pack, or the company name in the "Marketed By" line if that's clearer), the product name (the specific product name/variant, excluding the brand name), and the pack size / net content exactly as printed (e.g. "100 ml", "50 g", "8 ml"). Leave any of these as an empty string if not clearly identifiable.
-
-Also assess the print colours: state the process colours used as CMYK notation (e.g. "4C (CMYK)") based on what the artwork visually appears to use, and separately look specifically for any Pantone/PMS colour codes printed anywhere on the artwork (e.g. in a colour bar, registration marks, or spec notes near the edge of the file) and list exactly what's printed. If no Pantone/PMS code is visible anywhere on the artwork, leave that field as an empty string rather than guessing one.${crossCheckBlock}
+Also identify the brand/customer name (the brand this product is sold under — usually the most prominent name on the front of pack, or the company name in the "Marketed By" line if that's clearer), the product name (the specific product name/variant, excluding the brand name), and the pack size / net content exactly as printed (e.g. "100 ml", "50 g", "8 ml"). Leave any of these as an empty string if not clearly identifiable.${crossCheckBlock}
 
 Respond with ONLY raw JSON (no markdown code fences, no commentary before or after), exactly in this shape:
 {
@@ -760,8 +749,6 @@ Respond with ONLY raw JSON (no markdown code fences, no commentary before or aft
   "brand_name": "<brand/customer name, or empty string if unclear>",
   "product_name": "<product name/variant, or empty string if unclear>",
   "pack_size": "<pack size / net content exactly as printed, e.g. '100 ml', or empty string if unclear>",
-  "colors_cmyk": "<process colours used, e.g. '4C (CMYK)', based on visual assessment>",
-  "pantone_numbers": "<any Pantone/PMS code(s) explicitly printed on the artwork, comma-separated, or empty string if none visible>",
   "overall_summary": "<2-3 sentence plain-language summary of the artwork's compliance state and biggest issues, or confirmation it looks clean>"${jsonKeysBlock}
 }
 Include one checklist entry per rule listed above, in the same order. If a field cannot be verified from the image, use status "unclear" and say why in the note. If there are no spelling or grammar errors, return empty arrays for those. If no ingredients list is visible on the artwork, return an empty array for ingredients_printed.`;
@@ -1035,14 +1022,10 @@ function applyArtworkToJobCard(parsed){
   const jcCustomer = document.getElementById('jc-customer');
   const jcProduct = document.getElementById('jc-product');
   const jcPacksize = document.getElementById('jc-packsize');
-  const jcColors = document.getElementById('jc-colors');
-  const jcPantone = document.getElementById('jc-pantone');
   const jcFormcode = document.getElementById('jc-formcode');
   if(jcCustomer && parsed.brand_name) jcCustomer.value = parsed.brand_name;
   if(jcProduct && parsed.product_name) jcProduct.value = parsed.product_name;
   if(jcPacksize && parsed.pack_size) jcPacksize.value = parsed.pack_size;
-  if(jcColors && parsed.colors_cmyk) jcColors.value = parsed.colors_cmyk;
-  if(jcPantone && parsed.pantone_numbers) jcPantone.value = parsed.pantone_numbers;
   if(jcFormcode && formulationCode && !jcFormcode.value) jcFormcode.value = formulationCode;
   if(typeof saveJobCardDraft === 'function') saveJobCardDraft();
 }
@@ -1577,7 +1560,6 @@ async function renderCompareResults(parsed){
 const JOBCARD_FIELD_IDS = [
   'jc-jobno','jc-date','jc-customer','jc-product','jc-formcode','jc-packsize','jc-qty','jc-delivery',
   'jc-paper-type','jc-gsm',
-  'jc-colors','jc-pantone',
   'jc-lamination','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window','jc-packing','jc-remarks'
 ];
 const JOBCARD_STORAGE_KEY = 'artworkqc_jobcard_draft';
