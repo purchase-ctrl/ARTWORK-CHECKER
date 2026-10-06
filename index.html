@@ -243,7 +243,7 @@
   <nav class="tabs no-print">
     <button class="tab-btn active" data-tab="compliance">01 · Compliance Check</button>
     <button class="tab-btn" data-tab="measure">02 · Measurement Tool</button>
-    <button class="tab-btn" data-tab="compare">03 · Compare Artworks</button>
+    <button class="tab-btn" data-tab="compare">03 · Monocarton vs Inner</button>
     <button class="tab-btn" data-tab="jobcard">04 · Job Card</button>
   </nav>
 
@@ -353,11 +353,11 @@
   <!-- ============ COMPARE TAB ============ -->
   <section class="tab-panel" id="tab-compare">
     <div class="card no-print">
-      <h2><span class="n">→</span>Compare two artwork versions</h2>
+      <h2><span class="n">→</span>Compare Monocarton vs Inner Design</h2>
       <div class="btn-row" style="align-items:flex-start;gap:20px;flex-wrap:wrap;">
         <div style="flex:1;min-width:220px;">
           <div class="dropzone" id="compare-dropzone-a" style="padding:16px;">
-            <div class="dz-title">Previous artwork</div>
+            <div class="dz-title">Monocarton artwork</div>
             <div class="dz-sub">Tap to choose · PNG / JPG / WEBP / PDF</div>
           </div>
           <input type="file" id="compare-file-a" accept="image/*,application/pdf" style="display:none;">
@@ -371,7 +371,7 @@
         </div>
         <div style="flex:1;min-width:220px;">
           <div class="dropzone" id="compare-dropzone-b" style="padding:16px;">
-            <div class="dz-title">New artwork</div>
+            <div class="dz-title">Inner Design artwork</div>
             <div class="dz-sub">Tap to choose · PNG / JPG / WEBP / PDF</div>
           </div>
           <input type="file" id="compare-file-b" accept="image/*,application/pdf" style="display:none;">
@@ -385,28 +385,52 @@
         </div>
       </div>
       <div class="btn-row" style="margin-top:14px;">
-        <button id="compare-btn" disabled>Compare Artworks</button>
+        <button id="compare-btn" disabled>Compare &amp; Check Size</button>
         <span class="hint" id="compare-hint">Upload both artworks first.</span>
       </div>
       <div id="compare-loading-box"></div>
     </div>
 
+    <div class="card no-print">
+      <h2><span class="n">→</span>Pack size calculator</h2>
+      <p class="hint" style="margin-top:-4px;">Enter the Monocarton's assembled size and how many are packed into one Inner box — the expected Inner size is calculated automatically and checked against the Inner artwork when you compare.</p>
+      <div class="jc-grid">
+        <div class="jc-field"><label>Monocarton L (mm)</label><input type="number" step="any" min="0" id="ms-mono-l" placeholder="e.g. 25"></div>
+        <div class="jc-field"><label>Monocarton B (mm)</label><input type="number" step="any" min="0" id="ms-mono-b" placeholder="e.g. 12"></div>
+        <div class="jc-field"><label>Monocarton H (mm)</label><input type="number" step="any" min="0" id="ms-mono-h" placeholder="e.g. 30"></div>
+        <div class="jc-field"><label>Pack Quantity</label><input type="number" step="1" min="1" id="ms-packqty" value="12"></div>
+        <div class="jc-field"><label>Across (× L)</label><input type="number" step="1" min="1" id="ms-across" placeholder="e.g. 2"></div>
+        <div class="jc-field"><label>Deep (× B)</label><input type="number" step="1" min="1" id="ms-deep" placeholder="e.g. 6"></div>
+        <div class="jc-field"><label>Layers (× H)</label><input type="number" step="1" min="1" id="ms-layers" placeholder="e.g. 1"></div>
+        <div class="jc-field"><label>Tolerance (± mm)</label><input type="number" step="any" min="0" id="ms-tolerance" value="3"></div>
+      </div>
+      <div class="calib-status" id="ms-arrangement-status" style="margin-top:10px;"></div>
+      <div class="summary-text" id="ms-expected-size" style="margin-top:10px;">Enter the Monocarton size and arrangement above to calculate the expected Inner size.</div>
+    </div>
+
     <div id="compare-results-wrap" style="display:none;">
       <div class="card printable">
         <div class="report-meta" id="compare-report-meta"></div>
-        <h2 style="font-size:17px;">Artwork Comparison Report</h2>
+        <h2 style="font-size:17px;">Monocarton vs Inner Design — Comparison Report</h2>
         <div class="summary-text" id="compare-summary-text"></div>
 
-        <h2><span class="n">A</span>Size comparison</h2>
+        <h2><span class="n">A</span>Pack size check</h2>
         <table>
-          <thead><tr><th>Previous</th><th>New</th><th>Status</th></tr></thead>
+          <thead><tr><th>Expected Inner size (calculated)</th><th>Inner artwork — printed size found</th><th>Status</th></tr></thead>
+          <tbody id="compare-packcheck-body"></tbody>
+        </table>
+        <div class="hint" id="compare-packcheck-hint" style="display:none;"></div>
+
+        <h2 style="margin-top:18px;"><span class="n">B</span>Flat artwork size (reference only)</h2>
+        <table>
+          <thead><tr><th>Monocarton</th><th>Inner Design</th><th>Status</th></tr></thead>
           <tbody id="compare-size-body"></tbody>
         </table>
         <div class="hint" id="compare-size-hint" style="display:none;"></div>
 
-        <h2 style="margin-top:18px;"><span class="n">B</span>Detail differences</h2>
+        <h2 style="margin-top:18px;"><span class="n">C</span>Detail differences</h2>
         <table>
-          <thead><tr><th style="width:22%;">Field</th><th style="width:32%;">Previous</th><th style="width:32%;">New</th><th>Change</th></tr></thead>
+          <thead><tr><th style="width:22%;">Field</th><th style="width:32%;">Monocarton</th><th style="width:32%;">Inner Design</th><th>Change</th></tr></thead>
           <tbody id="compare-diff-body"></tbody>
         </table>
       </div>
@@ -1462,17 +1486,23 @@ document.getElementById('compare-btn').addEventListener('click', runCompare);
 document.getElementById('compare-print-btn').addEventListener('click', ()=>window.print());
 
 function buildComparePrompt(){
-  return `You are comparing two versions of the same packaging artwork for a cosmetics manufacturer: the FIRST image is the PREVIOUS approved artwork, the SECOND image is the NEW artwork being submitted. Carefully compare all visible printed content between them — checklist fields (batch no., mfg date, MRP, expiry/use-before wording, Mfd. By statement, M.L. No., Marketed By, customer care details, net content, ingredients list, EAN/barcode), plus any other text, layout, or visual differences you notice (colors, imagery, headings, claims, etc).
+  return `You are checking two related packaging artworks for a cosmetics manufacturer: the FIRST image is the MONOCARTON (the individual product's box), the SECOND image is the INNER DESIGN (the box/tray that holds multiple monocartons together as one pack). These are two different, physically separate pieces of packaging — not two versions of the same artwork — so compare them for CONSISTENCY of printed information, not as a revision diff.
+
+Carefully compare all visible printed content that should normally match between the Monocarton and the Inner Design — batch no., mfg/expiry date wording, MRP, Mfd. By statement, M.L. No., Marketed By, customer care details, net content, EAN/barcode, product/brand name — and flag anything that is inconsistent, missing on one but present on the other, or printed differently.
+
+Also, separately, look specifically for any printed box-dimension / size text on EACH artwork (often shown near a die-line, a spec box, or printed as "L x B x H" or similar, e.g. "250 x 140 x 310 mm"). Transcribe exactly what is printed, in whichever units are shown. If no dimension text is visible on an artwork, leave that field as an empty string — do not guess or calculate one.
 
 Respond with ONLY raw JSON (no markdown fences, no commentary), exactly in this shape:
 {
   "differences": [
-    {"field": "<what this difference is about>", "previous": "<value or description in the previous artwork>", "new": "<value or description in the new artwork>", "change_type": "added" | "removed" | "modified"}
+    {"field": "<what this difference is about>", "previous": "<value or description on the Monocarton>", "new": "<value or description on the Inner Design>", "change_type": "added" | "removed" | "modified"}
   ],
-  "dimension_note": "<any visually obvious size/proportion/layout difference you notice between the two, purely a visual observation — do not invent exact measurements>",
-  "summary": "<2-3 sentence plain-language summary of what changed between the two artworks, or confirmation there are no meaningful differences>"
+  "dimension_note": "<any visually obvious proportion/layout observation worth a manual look, purely visual — do not invent exact measurements>",
+  "monocarton_printed_size": "<box dimension text printed on the Monocarton artwork exactly as shown, or empty string if none visible>",
+  "inner_printed_size": "<box dimension text printed on the Inner Design artwork exactly as shown, or empty string if none visible>",
+  "summary": "<2-3 sentence plain-language summary of what's consistent/inconsistent between the two artworks>"
 }
-Only list fields that actually changed — if a field is identical, leave it out of "differences" entirely. If the two artworks are identical in content, return an empty differences array and say so in the summary.`;
+Only list fields in "differences" that are actually inconsistent between the two — if a field matches on both, leave it out entirely. If everything checked matches, return an empty differences array and say so in the summary.`;
 }
 
 async function runCompare(){
@@ -1518,13 +1548,128 @@ function loadImageDims(dataUrl){
   });
 }
 
+/* ================= pack size calculator ================= */
+function getPackCalcInputs(){
+  return {
+    monoL: parseFloat(document.getElementById('ms-mono-l').value),
+    monoB: parseFloat(document.getElementById('ms-mono-b').value),
+    monoH: parseFloat(document.getElementById('ms-mono-h').value),
+    packQty: parseInt(document.getElementById('ms-packqty').value, 10),
+    across: parseInt(document.getElementById('ms-across').value, 10),
+    deep: parseInt(document.getElementById('ms-deep').value, 10),
+    layers: parseInt(document.getElementById('ms-layers').value, 10),
+    tolerance: parseFloat(document.getElementById('ms-tolerance').value)
+  };
+}
+
+function computeExpectedInnerSize(inputs){
+  const {monoL, monoB, monoH, across, deep, layers} = inputs;
+  if([monoL, monoB, monoH, across, deep, layers].some(v => !v || isNaN(v) || v<=0)) return null;
+  return { L: monoL*across, B: monoB*deep, H: monoH*layers };
+}
+
+function updatePackCalcPreview(){
+  const inputs = getPackCalcInputs();
+  const statusEl = document.getElementById('ms-arrangement-status');
+  const expectedEl = document.getElementById('ms-expected-size');
+
+  if(inputs.across && inputs.deep && inputs.layers && inputs.packQty){
+    const product = inputs.across*inputs.deep*inputs.layers;
+    statusEl.classList.toggle('ok', product===inputs.packQty);
+    statusEl.textContent = product===inputs.packQty
+      ? `Arrangement ${inputs.across} × ${inputs.deep} × ${inputs.layers} = ${product} pcs — matches pack quantity.`
+      : `Arrangement ${inputs.across} × ${inputs.deep} × ${inputs.layers} = ${product} pcs — does not match pack quantity of ${inputs.packQty}. Adjust the arrangement.`;
+  } else {
+    statusEl.textContent = '';
+  }
+
+  const expected = computeExpectedInnerSize(inputs);
+  expectedEl.textContent = expected
+    ? `Expected Inner size: ${expected.L.toFixed(1)} × ${expected.B.toFixed(1)} × ${expected.H.toFixed(1)} mm (L × B × H)`
+    : 'Enter the Monocarton size and arrangement above to calculate the expected Inner size.';
+}
+['ms-mono-l','ms-mono-b','ms-mono-h','ms-packqty','ms-across','ms-deep','ms-layers','ms-tolerance'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updatePackCalcPreview);
+});
+updatePackCalcPreview();
+
+/* Pulls up to a few numbers (and a unit) out of printed dimension text like "250 x 140 x 310 mm". */
+function parseSizeString(str){
+  if(!str || !String(str).trim()) return null;
+  const s = String(str);
+  const unit = /inch|in\b|"/i.test(s) ? 'inch' : /\bcm\b/i.test(s) ? 'cm' : 'mm';
+  const nums = (s.match(/\d+(?:\.\d+)?/g) || []).map(Number);
+  if(!nums.length) return null;
+  const factor = unit==='inch' ? 25.4 : unit==='cm' ? 10 : 1;
+  return { values: nums.map(n=>n*factor), unit, raw: s };
+}
+
+/* Greedily pairs each expected [L,B,H] value with the closest parsed value, regardless of printed order. */
+function matchPackSizes(expectedArr, parsedValues, toleranceMM){
+  const remaining = parsedValues.slice();
+  return expectedArr.map(exp=>{
+    if(!remaining.length) return { expected: exp, matchedValue: null, diff: null, status: 'unclear' };
+    let bestIdx = 0, bestDiff = Infinity;
+    remaining.forEach((v,i)=>{
+      const diff = Math.abs(v-exp);
+      if(diff < bestDiff){ bestDiff = diff; bestIdx = i; }
+    });
+    const matchedValue = remaining.splice(bestIdx,1)[0];
+    return { expected: exp, matchedValue, diff: bestDiff, status: bestDiff<=toleranceMM ? 'pass' : 'fail' };
+  });
+}
+
 async function renderCompareResults(parsed){
   const wrap = document.getElementById('compare-results-wrap');
   wrap.style.display='block';
   document.getElementById('compare-report-meta').textContent =
-    `Previous: ${compareFileA.name}  ·  New: ${compareFileB.name}  ·  Compared: ${new Date().toLocaleString()}`;
+    `Monocarton: ${compareFileA.name}  ·  Inner Design: ${compareFileB.name}  ·  Compared: ${new Date().toLocaleString()}`;
   document.getElementById('compare-summary-text').textContent = parsed.summary || '';
 
+  /* ---- A. Pack size check ---- */
+  const packBody = document.getElementById('compare-packcheck-body');
+  const packHint = document.getElementById('compare-packcheck-hint');
+  packBody.innerHTML='';
+  packHint.style.display='none';
+
+  const calcInputs = getPackCalcInputs();
+  const expected = computeExpectedInnerSize(calcInputs);
+  if(!expected){
+    packHint.style.display='block';
+    packHint.textContent = 'Enter the Monocarton size and packing arrangement in the calculator above to run this check.';
+  } else {
+    const expectedLabel = `${expected.L.toFixed(1)} × ${expected.B.toFixed(1)} × ${expected.H.toFixed(1)} mm`;
+    const printedStr = parsed.inner_printed_size || '';
+    const parsedSize = parseSizeString(printedStr);
+    if(!parsedSize){
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${expectedLabel}</td>
+        <td>${printedStr ? escapeHtml(printedStr) : '<span class="none-found">No dimension text found on the Inner artwork</span>'}</td>
+        <td><span class="status-badge unclear">UNCLEAR</span></td>`;
+      packBody.appendChild(tr);
+      packHint.style.display='block';
+      packHint.textContent = 'No usable size was printed/found on the Inner Design artwork — verify the Inner box size manually against the calculated expected size above.';
+    } else {
+      const toleranceMM = calcInputs.tolerance || 3;
+      const results = matchPackSizes([expected.L, expected.B, expected.H], parsedSize.values, toleranceMM);
+      const allPass = results.every(r=>r.status==='pass');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${expectedLabel}</td>
+        <td>${escapeHtml(printedStr)}</td>
+        <td><span class="status-badge ${allPass?'pass':'fail'}">${allPass?'MATCH':'MISMATCH'}</span></td>`;
+      packBody.appendChild(tr);
+      if(!allPass){
+        packHint.style.display='block';
+        const labels = ['L','B','H'];
+        packHint.textContent = `Within ±${toleranceMM} mm tolerance — ` + results.map((r,i)=>
+          `${labels[i]}: expected ${r.expected.toFixed(1)}mm, closest printed value ${r.matchedValue!=null ? r.matchedValue.toFixed(1)+'mm' : '—'} (${r.status==='pass' ? 'OK' : 'off by '+r.diff.toFixed(1)+'mm'})`
+        ).join(' · ');
+      }
+    }
+  }
+
+  /* ---- B. Flat artwork size (reference only) ---- */
   const sizeBody = document.getElementById('compare-size-body');
   const sizeHint = document.getElementById('compare-size-hint');
   sizeBody.innerHTML='';
@@ -1534,16 +1679,16 @@ async function renderCompareResults(parsed){
     const [dimsA, dimsB] = await Promise.all([loadImageDims(compareFileA.dataUrl), loadImageDims(compareFileB.dataUrl)]);
     const wA = dimsA.w / compareFileA.sourcePxPerMM, hA = dimsA.h / compareFileA.sourcePxPerMM;
     const wB = dimsB.w / compareFileB.sourcePxPerMM, hB = dimsB.h / compareFileB.sourcePxPerMM;
-    const tolerance = 0.5; // mm
-    const match = Math.abs(wA-wB)<=tolerance && Math.abs(hA-hB)<=tolerance;
     const tr = document.createElement('tr');
     tr.innerHTML = `<td>${wA.toFixed(2)} × ${hA.toFixed(2)} mm</td>
       <td>${wB.toFixed(2)} × ${hB.toFixed(2)} mm</td>
-      <td><span class="status-badge ${match?'pass':'fail'}">${match?'MATCH':'DIFFERENT'}</span></td>`;
+      <td><span class="status-badge unclear">FLAT SHEET SIZE</span></td>`;
     sizeBody.appendChild(tr);
+    sizeHint.style.display='block';
+    sizeHint.textContent = "This is each file's flat printed page size (the die-cut sheet before folding/assembly) — not the same as the assembled box dimensions used in the pack size check above.";
   } else {
     sizeHint.style.display='block';
-    sizeHint.textContent = 'Exact size comparison needs both files uploaded as PDFs (which carry real physical page dimensions). At least one of these was a plain image, so only printed content was compared below, not exact size.';
+    sizeHint.textContent = 'Flat page size needs both files uploaded as PDFs. At least one of these was a plain image, so this reference row was skipped.';
   }
 
   if(parsed.dimension_note){
@@ -1552,11 +1697,12 @@ async function renderCompareResults(parsed){
     sizeBody.appendChild(tr);
   }
 
+  /* ---- C. Detail differences ---- */
   const diffBody = document.getElementById('compare-diff-body');
   diffBody.innerHTML='';
   const diffs = parsed.differences || [];
   if(!diffs.length){
-    diffBody.innerHTML = `<tr><td colspan="4" class="none-found">No content differences found.</td></tr>`;
+    diffBody.innerHTML = `<tr><td colspan="4" class="none-found">No content inconsistencies found.</td></tr>`;
   } else {
     diffs.forEach(d=>{
       const tr = document.createElement('tr');
