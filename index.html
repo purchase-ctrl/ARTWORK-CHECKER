@@ -420,7 +420,8 @@
 
     <div class="card no-print">
       <h2><span class="n">→</span>Pack size calculator</h2>
-      <p class="hint" style="margin-top:-4px;">Monocarton L &amp; B fill in automatically once the Monocarton artwork is uploaded as a PDF (adjust if needed — only PDFs carry real physical scale, a plain image can't auto-measure) — H can't be measured from a flat artwork, so enter it by hand. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
+      <p class="hint" style="margin-top:-4px;">Monocarton L, B &amp; H fill in automatically once the artwork is uploaded as a PDF, by finding its printed die-line/crease grid and reading the Front/Back panel width (Length), Side panel width (Breadth) and main-row height (Height) — adjust any value if needed. If no die-line grid can be found, L &amp; B fall back to the full design size and H is left for manual entry. Only PDFs carry real physical scale; a plain image can't auto-measure. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
+      <div class="hint" id="ms-autofill-status" style="margin-top:-4px;"></div>
       <div class="jc-grid">
         <div class="jc-field"><label>Monocarton L (mm)</label><input type="number" step="any" min="0" id="ms-mono-l" placeholder="auto from artwork"></div>
         <div class="jc-field"><label>Monocarton B (mm)</label><input type="number" step="any" min="0" id="ms-mono-b" placeholder="auto from artwork"></div>
@@ -1498,19 +1499,162 @@ async function handleCompareFile(file, which){
   }
 }
 
-/* Measures the Monocarton artwork's design size (divided by sheet repeats) and fills L & B automatically. */
+/* Measures the Monocarton artwork's panel grid (preferred) or overall design size (fallback,
+   divided by sheet repeats) and fills L, B & H automatically. */
 async function autofillMonocartonSize(){
   if(!compareFileA || !compareFileA.sourcePxPerMM) return; // only possible for PDFs, which carry real physical scale
   const repAcross = parseInt(document.getElementById('ms-mono-rep-across').value, 10) || 1;
   const repDown = parseInt(document.getElementById('ms-mono-rep-down').value, 10) || 1;
+  const statusEl = document.getElementById('ms-autofill-status');
+  try{
+    const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown);
+    if(panels){
+      document.getElementById('ms-mono-l').value = panels.lengthMM.toFixed(1);
+      document.getElementById('ms-mono-b').value = panels.breadthMM.toFixed(1);
+      document.getElementById('ms-mono-h').value = panels.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found) — please double-check these against the spec.';
+      updatePackCalcPreview();
+      return;
+    }
+  }catch(e){ /* fall through to the bounding-box fallback below */ }
   try{
     const size = await getDesignSizeMM(compareFileA, repAcross, repDown);
     if(size){
       document.getElementById('ms-mono-l').value = size.wMM.toFixed(1);
       document.getElementById('ms-mono-b').value = size.hMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Couldn’t find a clear die-line grid on this artwork — used the full design size for L & B instead. Enter Height by hand.';
       updatePackCalcPreview();
     }
   }catch(e){ /* measurement failed — manual entry still works */ }
+}
+
+/* ---- carton panel detection: locates the printed die-line/crease grid (a vivid red/magenta
+   cut-line ink, distinct from pale panel fills and brand colors) and reads panel widths/height
+   off it directly, instead of just the overall design bounding box. ---- */
+function isDielineColor(r,g,b){
+  return r>170 && g<95 && b<115 && (r-g)>95 && (r-b)>75;
+}
+
+function buildDielineMask(imageData, width, height){
+  const data = imageData.data;
+  const mask = new Uint8Array(width*height);
+  for(let y=0;y<height;y++){
+    const rowOffset = y*width*4;
+    for(let x=0;x<width;x++){
+      const i = rowOffset + x*4;
+      if(data[i+3]<=10) continue;
+      if(isDielineColor(data[i],data[i+1],data[i+2])) mask[y*width+x]=1;
+    }
+  }
+  return mask;
+}
+
+function clusterIndices(indices, gapTol){
+  if(!indices.length) return [];
+  const clusters=[];
+  let cur=[indices[0]];
+  for(let k=1;k<indices.length;k++){
+    if(indices[k]-cur[cur.length-1] <= gapTol) cur.push(indices[k]);
+    else { clusters.push(cur); cur=[indices[k]]; }
+  }
+  clusters.push(cur);
+  return clusters.map(cl=> cl.reduce((a,b)=>a+b,0)/cl.length );
+}
+
+/* Groups segments into pairs of near-equal width (a die-line's Front/Back panels mirror each
+   other, as do its two Side panels), returning the widest qualifying pairs first. */
+function findWidthPairs(segments, relTol){
+  const used = new Set();
+  const pairs = [];
+  const bySize = [...segments].sort((a,b)=>b.width-a.width);
+  for(let i=0;i<bySize.length;i++){
+    if(used.has(bySize[i])) continue;
+    for(let j=i+1;j<bySize.length;j++){
+      if(used.has(bySize[j])) continue;
+      const diff = Math.abs(bySize[i].width-bySize[j].width) / Math.max(bySize[i].width,bySize[j].width);
+      if(diff<=relTol){
+        pairs.push([bySize[i], bySize[j]]);
+        used.add(bySize[i]); used.add(bySize[j]);
+        break;
+      }
+    }
+  }
+  return pairs;
+}
+
+/* Detects the carton's panel grid and derives Length (Front/Back panel width), Breadth (Side
+   panel width) and Height (main panel row, between its top/bottom creases) in mm. Returns null
+   if no reliable die-line grid is found, so the caller can fall back to the plain design-size
+   measurement. */
+async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
+  if(!file || !file.sourcePxPerMM) return null;
+  const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
+  const full = ctx.getImageData(0,0,width,height);
+  const bbox = findContentBoundingBox(full, width, height);
+  if(!bbox) return null;
+
+  const divAcross = repeatsAcross && repeatsAcross>0 ? repeatsAcross : 1;
+  const divDown = repeatsDown && repeatsDown>0 ? repeatsDown : 1;
+  const cellW = Math.round(bbox.width/divAcross);
+  const cellH = Math.round(bbox.height/divDown);
+  if(cellW<40 || cellH<40) return null;
+
+  const imageData = ctx.getImageData(bbox.minX, bbox.minY, cellW, cellH);
+  const mask = buildDielineMask(imageData, cellW, cellH);
+  if(!mask.some(v=>v)) return null; // no die-line-colored ink found — nothing to detect
+
+  const colDensity = new Float32Array(cellW);
+  for(let x=0;x<cellW;x++){
+    let count=0;
+    for(let y=0;y<cellH;y++) count += mask[y*cellW+x];
+    colDensity[x] = count/cellH;
+  }
+  const colIdx = [];
+  for(let x=0;x<cellW;x++) if(colDensity[x]>0.3) colIdx.push(x);
+  if(colIdx.length<4) return null;
+  const vLines = clusterIndices(colIdx, 3);
+  if(vLines.length<4) return null;
+
+  const segments = [];
+  for(let k=0;k<vLines.length-1;k++){
+    segments.push({ from:vLines[k], to:vLines[k+1], width:vLines[k+1]-vLines[k] });
+  }
+  const pairs = findWidthPairs(segments, 0.12).filter(p=>p[0].width > cellW*0.03);
+  if(pairs.length<2) return null;
+
+  const lengthPair = pairs[0];
+  const breadthPair = pairs[1];
+  const lengthPx = (lengthPair[0].width + lengthPair[1].width)/2;
+  const breadthPx = (breadthPair[0].width + breadthPair[1].width)/2;
+
+  const lp = lengthPair[0];
+  const xFrom = Math.max(0, Math.round(lp.from)), xTo = Math.min(cellW, Math.round(lp.to));
+  const segW = Math.max(1, xTo-xFrom);
+  const rowDensity = new Float32Array(cellH);
+  for(let y=0;y<cellH;y++){
+    let count=0;
+    for(let x=xFrom;x<xTo;x++) count += mask[y*cellW+x];
+    rowDensity[y] = count/segW;
+  }
+  const rowIdx = [];
+  for(let y=0;y<cellH;y++) if(rowDensity[y]>0.3) rowIdx.push(y);
+  if(rowIdx.length<2) return null;
+  const hLines = clusterIndices(rowIdx, 3);
+  if(hLines.length<2) return null;
+  let bestGap=0;
+  for(let k=0;k<hLines.length-1;k++){
+    const gap = hLines[k+1]-hLines[k];
+    if(gap>bestGap) bestGap=gap;
+  }
+  if(bestGap<=0) return null;
+
+  const pxPerMM = file.sourcePxPerMM;
+  return {
+    lengthMM: lengthPx/pxPerMM,
+    breadthMM: breadthPx/pxPerMM,
+    heightMM: bestGap/pxPerMM,
+    panelsDetected: vLines.length-1
+  };
 }
 ['ms-mono-rep-across','ms-mono-rep-down'].forEach(id=>{
   const el = document.getElementById(id);
@@ -1588,7 +1732,7 @@ async function runCompare(){
 }
 
 /* ---- design-size detection: auto-crop a rendered page to its printed content, ignoring white margins ---- */
-function getImageDataFromDataUrl(dataUrl){
+function getCanvasFromDataUrl(dataUrl){
   return new Promise((resolve,reject)=>{
     const img = new Image();
     img.onload = ()=>{
@@ -1596,13 +1740,16 @@ function getImageDataFromDataUrl(dataUrl){
       c.width = img.naturalWidth; c.height = img.naturalHeight;
       const ctx = c.getContext('2d');
       ctx.drawImage(img,0,0);
-      try{
-        resolve({ imageData: ctx.getImageData(0,0,c.width,c.height), width:c.width, height:c.height });
-      }catch(e){ reject(e); }
+      resolve({ canvas:c, ctx, width:c.width, height:c.height });
     };
     img.onerror = ()=>reject(new Error('Could not load image for design-size detection.'));
     img.src = dataUrl;
   });
+}
+
+async function getImageDataFromDataUrl(dataUrl){
+  const { ctx, width, height } = await getCanvasFromDataUrl(dataUrl);
+  return { imageData: ctx.getImageData(0,0,width,height), width, height };
 }
 
 function findContentBoundingBox(imageData, width, height){
@@ -1624,7 +1771,7 @@ function findContentBoundingBox(imageData, width, height){
     }
   }
   if(maxX<0) return null;
-  return { width: maxX-minX+stride, height: maxY-minY+stride };
+  return { minX, minY, width: maxX-minX+stride, height: maxY-minY+stride };
 }
 
 async function getDesignSizeMM(file, repeatsAcross, repeatsDown){
