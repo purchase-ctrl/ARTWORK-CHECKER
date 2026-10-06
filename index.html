@@ -392,6 +392,15 @@
     </div>
 
     <div class="card no-print">
+      <h2><span class="n">→</span>Monocarton artwork layout</h2>
+      <p class="hint" style="margin-top:-4px;">If the Monocarton PDF is a print sheet with the same design repeated several times (a ganged/imposition layout), tell me how many repeats so the Design size check (section B) measures one unit, not the whole sheet.</p>
+      <div class="jc-grid">
+        <div class="jc-field"><label>Repeats — Across</label><input type="number" step="1" min="1" id="ms-mono-rep-across" value="1"></div>
+        <div class="jc-field"><label>Repeats — Down</label><input type="number" step="1" min="1" id="ms-mono-rep-down" value="1"></div>
+      </div>
+    </div>
+
+    <div class="card no-print">
       <h2><span class="n">→</span>Pack size calculator</h2>
       <p class="hint" style="margin-top:-4px;">Enter the Monocarton's assembled size and how many are packed into one Inner box — the expected Inner size is calculated automatically and checked against the Inner artwork when you compare.</p>
       <div class="jc-grid">
@@ -1580,12 +1589,17 @@ function findContentBoundingBox(imageData, width, height){
   return { width: maxX-minX+stride, height: maxY-minY+stride };
 }
 
-async function getDesignSizeMM(file){
+async function getDesignSizeMM(file, repeatsAcross, repeatsDown){
   if(!file.sourcePxPerMM) return null;
   const { imageData, width, height } = await getImageDataFromDataUrl(file.dataUrl);
   const bbox = findContentBoundingBox(imageData, width, height);
   if(!bbox) return null;
-  return { wMM: bbox.width / file.sourcePxPerMM, hMM: bbox.height / file.sourcePxPerMM };
+  const divAcross = repeatsAcross && repeatsAcross>0 ? repeatsAcross : 1;
+  const divDown = repeatsDown && repeatsDown>0 ? repeatsDown : 1;
+  return {
+    wMM: (bbox.width / file.sourcePxPerMM) / divAcross,
+    hMM: (bbox.height / file.sourcePxPerMM) / divDown
+  };
 }
 
 /* ================= pack size calculator ================= */
@@ -1717,7 +1731,12 @@ async function renderCompareResults(parsed){
 
   if(compareFileA.sourcePxPerMM && compareFileB.sourcePxPerMM){
     try{
-      const [designA, designB] = await Promise.all([getDesignSizeMM(compareFileA), getDesignSizeMM(compareFileB)]);
+      const repAcross = parseInt(document.getElementById('ms-mono-rep-across').value, 10) || 1;
+      const repDown = parseInt(document.getElementById('ms-mono-rep-down').value, 10) || 1;
+      const [designA, designB] = await Promise.all([
+        getDesignSizeMM(compareFileA, repAcross, repDown),
+        getDesignSizeMM(compareFileB, 1, 1)
+      ]);
       if(designA && designB){
         const toleranceMM = getPackCalcInputs().tolerance || 3;
         const match = Math.abs(designA.wMM-designB.wMM)<=toleranceMM && Math.abs(designA.hMM-designB.hMM)<=toleranceMM;
@@ -1727,7 +1746,10 @@ async function renderCompareResults(parsed){
           <td><span class="status-badge ${match?'pass':'fail'}">${match?'MATCH':'DIFFERENT'}</span></td>`;
         sizeBody.appendChild(tr);
         sizeHint.style.display='block';
-        sizeHint.textContent = `Each file auto-cropped to its printed design content (trimmed of surrounding white margin/bleed), compared within ±${toleranceMM}mm tolerance. Since a Monocarton and an Inner box are normally different sizes, treat DIFFERENT as expected unless you specifically intend these two designs to match.`;
+        const repNote = (repAcross>1 || repDown>1)
+          ? ` Monocarton total printed content was divided by ${repAcross} × ${repDown} repeats to get one unit's artwork size.`
+          : '';
+        sizeHint.textContent = `Each file auto-cropped to its printed design content (trimmed of surrounding white margin/bleed), compared within ±${toleranceMM}mm tolerance.${repNote} Since a Monocarton and an Inner box are normally different sizes, treat DIFFERENT as expected unless you specifically intend these two designs to match.`;
       } else {
         sizeHint.style.display='block';
         sizeHint.textContent = 'Could not detect printed content bounds on one of the files (the rendered page may be blank, fully bled to the edge, or failed to load for measurement).';
