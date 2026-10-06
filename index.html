@@ -402,15 +402,15 @@
 
     <div class="card no-print">
       <h2><span class="n">→</span>Pack size calculator</h2>
-      <p class="hint" style="margin-top:-4px;">Enter the Monocarton's assembled size and how many are packed into one Inner box — the expected Inner size is calculated automatically and checked against the Inner artwork when you compare.</p>
+      <p class="hint" style="margin-top:-4px;">Monocarton L &amp; B fill in automatically once the Monocarton artwork is uploaded as a PDF (adjust if needed — only PDFs carry real physical scale, a plain image can't auto-measure) — H can't be measured from a flat artwork, so enter it by hand. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
       <div class="jc-grid">
-        <div class="jc-field"><label>Monocarton L (mm)</label><input type="number" step="any" min="0" id="ms-mono-l" placeholder="e.g. 25"></div>
-        <div class="jc-field"><label>Monocarton B (mm)</label><input type="number" step="any" min="0" id="ms-mono-b" placeholder="e.g. 12"></div>
+        <div class="jc-field"><label>Monocarton L (mm)</label><input type="number" step="any" min="0" id="ms-mono-l" placeholder="auto from artwork"></div>
+        <div class="jc-field"><label>Monocarton B (mm)</label><input type="number" step="any" min="0" id="ms-mono-b" placeholder="auto from artwork"></div>
         <div class="jc-field"><label>Monocarton H (mm)</label><input type="number" step="any" min="0" id="ms-mono-h" placeholder="e.g. 30"></div>
         <div class="jc-field"><label>Pack Quantity</label><input type="number" step="1" min="1" id="ms-packqty" value="12"></div>
-        <div class="jc-field"><label>Across (× L)</label><input type="number" step="1" min="1" id="ms-across" placeholder="e.g. 2"></div>
-        <div class="jc-field"><label>Deep (× B)</label><input type="number" step="1" min="1" id="ms-deep" placeholder="e.g. 6"></div>
-        <div class="jc-field"><label>Layers (× H)</label><input type="number" step="1" min="1" id="ms-layers" placeholder="e.g. 1"></div>
+        <div class="jc-field"><label>Across (× L)</label><input type="number" step="1" min="1" id="ms-across" value="2"></div>
+        <div class="jc-field"><label>Deep (× B)</label><input type="number" step="1" min="1" id="ms-deep" value="6"></div>
+        <div class="jc-field"><label>Layers (× H)</label><input type="number" step="1" min="1" id="ms-layers" value="1"></div>
         <div class="jc-field"><label>Tolerance (± mm)</label><input type="number" step="any" min="0" id="ms-tolerance" value="3"></div>
       </div>
       <div class="calib-status" id="ms-arrangement-status" style="margin-top:10px;"></div>
@@ -1474,10 +1474,30 @@ async function handleCompareFile(file, which){
     document.getElementById('compare-dropzone-'+which).style.display='none';
     document.getElementById('compare-results-wrap').style.display='none';
     updateCompareButton();
+    if(which==='a') autofillMonocartonSize();
   }catch(err){
     alert(err.message || 'Could not read that file.');
   }
 }
+
+/* Measures the Monocarton artwork's design size (divided by sheet repeats) and fills L & B automatically. */
+async function autofillMonocartonSize(){
+  if(!compareFileA || !compareFileA.sourcePxPerMM) return; // only possible for PDFs, which carry real physical scale
+  const repAcross = parseInt(document.getElementById('ms-mono-rep-across').value, 10) || 1;
+  const repDown = parseInt(document.getElementById('ms-mono-rep-down').value, 10) || 1;
+  try{
+    const size = await getDesignSizeMM(compareFileA, repAcross, repDown);
+    if(size){
+      document.getElementById('ms-mono-l').value = size.wMM.toFixed(1);
+      document.getElementById('ms-mono-b').value = size.hMM.toFixed(1);
+      updatePackCalcPreview();
+    }
+  }catch(e){ /* measurement failed — manual entry still works */ }
+}
+['ms-mono-rep-across','ms-mono-rep-down'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', autofillMonocartonSize);
+});
 
 function updateCompareButton(){
   const btn = document.getElementById('compare-btn');
