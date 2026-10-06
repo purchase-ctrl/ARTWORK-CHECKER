@@ -178,6 +178,8 @@
   }
   .jc-field textarea{resize:vertical;min-height:56px;font-family:var(--sans);}
   .jc-field input:focus, .jc-field select:focus, .jc-field textarea:focus{outline:1px solid var(--accent);border-color:var(--accent);}
+  .jc-field select.jc-yesno-yes{color:var(--pass);font-weight:700;}
+  .jc-field select.jc-yesno-no{color:var(--fail);font-weight:700;}
   .jc-print-view{display:none;}
   .jc-artwork-page img{display:block;margin:12px auto 0;max-width:100%;height:auto;border:1px solid var(--line);}
   .jc-artwork-hint{color:var(--ink-soft);font-size:13px;font-style:italic;text-align:center;padding:24px 0;}
@@ -190,12 +192,12 @@
     .jc-field select{background-image:none;}
     .jc-field textarea{resize:none;min-height:26px;overflow:hidden;}
     .jc-field label{color:var(--ink-soft);}
-    /* The page has a standard 12mm @page margin (see below) everywhere except this one page: pulling it out by
-       the same 7mm on every side leaves only ~5mm from the physical paper edge, as close as a printer safely allows,
-       so the artwork can fill nearly the whole sheet without the rest of the document looking edge-to-edge. */
-    .jc-artwork-page{page-break-after:always;margin:-7mm -7mm 0 -7mm;}
-    .jc-artwork-page h2{font-size:10px;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);}
-    .jc-artwork-page img{display:block;margin:0 auto;width:200mm;height:280mm;object-fit:contain;border:none;}
+    /* The artwork page gets a tighter 5mm margin via a dynamically-inserted @page :first rule (see the
+       beforeprint/afterprint handlers in the script) so it isn't edge-to-edge, while every other printed
+       page — including the rest of the Job Card — keeps the normal 12mm margin set below. */
+    .jc-artwork-page{page-break-after:always;}
+    .jc-artwork-page h2{font-size:10px;margin:0 0 2mm;line-height:1.2;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);}
+    .jc-artwork-page img{display:block;margin:0 auto;width:100%;height:260mm;object-fit:contain;border:none;}
     #jobcard-artwork-card.jc-no-artwork{display:none !important;}
   }
 
@@ -1833,6 +1835,23 @@ const JOBCARD_FIELD_IDS = [
   'jc-lamination','jc-hybriduv','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window','jc-packing','jc-remarks'
 ];
 const JOBCARD_STORAGE_KEY = 'artworkqc_jobcard_draft';
+const JOBCARD_YESNO_IDS = [
+  'jc-metpet','jc-lamination','jc-hybriduv','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window'
+];
+function updateYesNoColor(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.classList.remove('jc-yesno-yes','jc-yesno-no');
+  if(el.value === 'Yes') el.classList.add('jc-yesno-yes');
+  else if(el.value === 'No') el.classList.add('jc-yesno-no');
+}
+function updateAllYesNoColors(){
+  JOBCARD_YESNO_IDS.forEach(updateYesNoColor);
+}
+JOBCARD_YESNO_IDS.forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('change', ()=>updateYesNoColor(id));
+});
 
 function saveJobCardDraft(){
   const data = {};
@@ -1893,12 +1912,33 @@ function updateJobCardArtworkPreview(){
 updateJobCardArtworkPreview();
 
 loadJobCardDraft();
+updateAllYesNoColors();
 // Fresh form (no saved job no. yet): assign the next sequence number and today's date.
 const jcJobnoEl = document.getElementById('jc-jobno');
 const jcDateEl = document.getElementById('jc-date');
 if(jcJobnoEl && !jcJobnoEl.value) jcJobnoEl.value = nextJobCardNo();
 if(jcDateEl && !jcDateEl.value) jcDateEl.value = todayISO();
 saveJobCardDraft();
+
+/* Tightens just the first printed page to a 5mm margin, but only while printing the Job Card WITH an
+   artwork page — every other print (Compliance report, Compare report, Job Card without artwork) keeps
+   the normal 12mm @page margin untouched. Done via a temporary stylesheet rather than a negative CSS
+   margin, since a negative margin on the very first element in the document can trick some print engines
+   into inserting a blank leading page. */
+let jcTightFirstPageStyle = null;
+window.addEventListener('beforeprint', ()=>{
+  const onJobCardTab = document.getElementById('tab-jobcard').classList.contains('active');
+  const artworkCard = document.getElementById('jobcard-artwork-card');
+  const hasArtwork = onJobCardTab && artworkCard && !artworkCard.classList.contains('jc-no-artwork');
+  if(hasArtwork){
+    jcTightFirstPageStyle = document.createElement('style');
+    jcTightFirstPageStyle.textContent = '@page :first { margin: 5mm; }';
+    document.head.appendChild(jcTightFirstPageStyle);
+  }
+});
+window.addEventListener('afterprint', ()=>{
+  if(jcTightFirstPageStyle){ jcTightFirstPageStyle.remove(); jcTightFirstPageStyle = null; }
+});
 
 document.getElementById('jobcard-print-btn').addEventListener('click', ()=>window.print());
 document.getElementById('jobcard-clear-btn').addEventListener('click', ()=>{
@@ -1909,6 +1949,7 @@ document.getElementById('jobcard-clear-btn').addEventListener('click', ()=>{
   });
   jcJobnoEl.value = nextJobCardNo();
   jcDateEl.value = todayISO();
+  updateAllYesNoColors();
   saveJobCardDraft();
 });
 </script>
