@@ -461,6 +461,14 @@
             </select>
           </div>
           <div class="jc-field"><label>GSM / Thickness</label><input type="text" id="jc-gsm" placeholder="e.g. 300 GSM"></div>
+          <div class="jc-field">
+            <label>Metpet</label>
+            <select id="jc-metpet">
+              <option value="">— select —</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -470,6 +478,14 @@
           <div class="jc-field">
             <label>Lamination</label>
             <select id="jc-lamination">
+              <option value="">— select —</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
+          <div class="jc-field">
+            <label>Hybrid UV</label>
+            <select id="jc-hybriduv">
               <option value="">— select —</option>
               <option>Yes</option>
               <option>No</option>
@@ -1559,8 +1575,8 @@ async function renderCompareResults(parsed){
 /* ================= job card ================= */
 const JOBCARD_FIELD_IDS = [
   'jc-jobno','jc-date','jc-customer','jc-product','jc-formcode','jc-packsize','jc-qty','jc-delivery',
-  'jc-paper-type','jc-gsm',
-  'jc-lamination','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window','jc-packing','jc-remarks'
+  'jc-paper-type','jc-gsm','jc-metpet',
+  'jc-lamination','jc-hybriduv','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window','jc-packing','jc-remarks'
 ];
 const JOBCARD_STORAGE_KEY = 'artworkqc_jobcard_draft';
 
