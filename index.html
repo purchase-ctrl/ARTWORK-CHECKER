@@ -1594,7 +1594,7 @@ async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
   if(!file || !file.sourcePxPerMM) return null;
   const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
   const full = ctx.getImageData(0,0,width,height);
-  const bbox = findContentBoundingBox(full, width, height);
+  const bbox = findFirstIslandBoundingBox(full, width, height, file.sourcePxPerMM);
   if(!bbox) return null;
 
   const divAcross = repeatsAcross && repeatsAcross>0 ? repeatsAcross : 1;
@@ -1778,10 +1778,77 @@ function findContentBoundingBox(imageData, width, height){
   return { minX, minY, width: maxX-minX+stride, height: maxY-minY+stride };
 }
 
+/* Like findContentBoundingBox, but when a sheet has several separate artworks/variants laid out
+   side by side (a quotation/proof sheet, say, or extra header/legend text above the artwork),
+   this only measures the FIRST one. It first finds the tallest band of printed content, reading
+   top-to-bottom (so a thin header/title/legend line above the real artwork is set aside), then
+   within that band, reading left-to-right, stops at the first sufficiently wide blank gap and
+   ignores everything past it — leaving just the left-most artwork block. A ganged/repeated sheet
+   with no real gap between copies is unaffected (it's read as one block, same as before —
+   repeatsAcross/Down still divides that block down to one unit). */
+function findFirstIslandBoundingBox(imageData, width, height, pxPerMM){
+  const data = imageData.data;
+  const whiteThreshold = 248, alphaThreshold = 10;
+  const stride = (width*height) > 6000000 ? 2 : 1;
+  const isContent = (x,y)=>{
+    const i = (y*width+x)*4;
+    const a = data[i+3];
+    if(a<=alphaThreshold) return false;
+    if(data[i]>=whiteThreshold && data[i+1]>=whiteThreshold && data[i+2]>=whiteThreshold) return false;
+    return true;
+  };
+
+  // 1) find the tallest band of content, top to bottom, across the full width
+  const nRows = Math.ceil(height/stride);
+  const rowHasContent = new Uint8Array(nRows);
+  for(let yi=0; yi<nRows; yi++){
+    const y = yi*stride;
+    for(let x=0; x<width; x+=stride){ if(isContent(x,y)){ rowHasContent[yi]=1; break; } }
+  }
+  let bestStart=-1, bestEnd=-1, bestLen=0, curStart=-1;
+  for(let yi=0; yi<=nRows; yi++){
+    const on = yi<nRows && rowHasContent[yi];
+    if(on && curStart<0) curStart=yi;
+    if(!on && curStart>=0){
+      const len = yi-curStart;
+      if(len>bestLen){ bestLen=len; bestStart=curStart; bestEnd=yi-1; }
+      curStart=-1;
+    }
+  }
+  if(bestStart<0) return null;
+  const bandY0 = bestStart*stride, bandY1 = Math.min(height-1, bestEnd*stride+stride-1);
+
+  // 2) within that band only, find the first content island reading left to right
+  const nCols = Math.ceil(width/stride);
+  const hasContent = new Uint8Array(nCols);
+  for(let xi=0; xi<nCols; xi++){
+    const x = xi*stride;
+    for(let y=bandY0; y<=bandY1; y+=stride){ if(isContent(x,y)){ hasContent[xi]=1; break; } }
+  }
+  const minGapPx = pxPerMM ? Math.max(6, Math.round(pxPerMM*6)) : Math.max(10, Math.round(width*0.015));
+  const minGapCols = Math.max(1, Math.round(minGapPx/stride));
+
+  let xi = 0;
+  while(xi<nCols && !hasContent[xi]) xi++;
+  if(xi>=nCols) return null;
+  let lastContentXi = xi;
+  const islandStartXi = xi;
+  while(xi<nCols){
+    if(hasContent[xi]){ lastContentXi = xi; xi++; continue; }
+    const gapStart = xi;
+    while(xi<nCols && !hasContent[xi]) xi++;
+    if(xi-gapStart >= minGapCols) break; // wide gap — first island ends at gapStart
+  }
+  const minX = islandStartXi*stride;
+  const maxX = Math.min(width-1, lastContentXi*stride + stride - 1);
+
+  return { minX, minY: bandY0, width: maxX-minX+1, height: bandY1-bandY0+1 };
+}
+
 async function getDesignSizeMM(file, repeatsAcross, repeatsDown){
   if(!file.sourcePxPerMM) return null;
   const { imageData, width, height } = await getImageDataFromDataUrl(file.dataUrl);
-  const bbox = findContentBoundingBox(imageData, width, height);
+  const bbox = findFirstIslandBoundingBox(imageData, width, height, file.sourcePxPerMM);
   if(!bbox) return null;
   const divAcross = repeatsAcross && repeatsAcross>0 ? repeatsAcross : 1;
   const divDown = repeatsDown && repeatsDown>0 ? repeatsDown : 1;
