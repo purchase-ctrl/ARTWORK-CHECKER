@@ -38,8 +38,15 @@ privacy terms change) or back to Anthropic — just ask.
 3. Copy the key.
 4. In Vercel, set `GEMINI_API_KEY` to that key.
 
-Free tier limits are generous for this tool (roughly 15 requests/minute,
-1,500/day) — a single compliance check or comparison is one request.
+This uses the `gemini-3.5-flash-lite` model specifically because its free
+tier allows around 500 requests/day — some of Google's newer, heavier models
+(e.g. `gemini-3.6-flash`) are currently capped at only 20/day on the free
+tier, which is too low for real daily use. A single compliance check or
+comparison is one request. If you ever hit the daily limit anyway, either
+wait for the midnight-Pacific-time reset or enable billing on the Google
+Cloud project for much higher limits (Google's free-tier numbers shift over
+time, so if this starts erroring again, check https://ai.google.dev/gemini-api/docs/rate-limits
+for the current figures).
 
 ### Google Sheet setup (no service account — just Apps Script)
 
