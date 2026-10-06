@@ -185,25 +185,33 @@
     .jc-field input, .jc-field select, .jc-field textarea{border:none;padding:2px 0;background:transparent;}
     .jc-field label{color:var(--ink-soft);}
     .jc-artwork-page{page-break-after:always;}
-    .jc-artwork-page img{max-height:240mm;object-fit:contain;border:none;margin-top:8px;}
+    .jc-artwork-page h2{font-size:10px;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);}
+    /* Content box after the 5mm @page margin on A4 is 200mm x 287mm; reserve a little for the heading. */
+    .jc-artwork-page img{display:block;margin:0 auto;width:200mm;height:280mm;object-fit:contain;border:none;}
     #jobcard-artwork-card.jc-no-artwork{display:none !important;}
   }
 
   /* ---------- print ---------- */
   .no-print{}
   @media print{
-    @page{ margin: 18mm 15mm; }
+    @page{ size: A4; margin: 5mm; }
     body{background:#fff;}
     .no-print{display:none !important;}
+    .masthead{display:none !important;}
     .app{max-width:100%;padding:0;margin:0;}
-    #print-area{display:block !important;padding:0 4mm;}
-    .printable{display:block !important;padding:0 4mm;}
-    .card{border:none;padding:0;margin-bottom:20px;}
-    table{page-break-inside:auto;width:100%;}
+    #print-area{display:block !important;padding:0;}
+    .printable{display:block !important;padding:0;}
+    .card{border:none;padding:0;margin-bottom:10px;}
+    table{page-break-inside:auto;width:100%;font-size:11.5px;}
     tr{page-break-inside:avoid;}
-    th,td{padding:8px 6px;}
+    th,td{padding:5px 4px;}
     h2{page-break-after:avoid;}
-    .summary-strip{margin-bottom:10px;}
+    .summary-strip{margin-bottom:8px;}
+    .jc-grid{gap:6px 14px;}
+    .jc-field{gap:1px;}
+    .jc-field label{font-size:9.5px;}
+    .jc-field input, .jc-field select, .jc-field textarea{font-size:12px;}
+    .jc-field textarea{min-height:32px;}
   }
 </style>
 </head>
