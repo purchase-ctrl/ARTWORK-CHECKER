@@ -179,9 +179,14 @@
   .jc-field textarea{resize:vertical;min-height:56px;font-family:var(--sans);}
   .jc-field input:focus, .jc-field select:focus, .jc-field textarea:focus{outline:1px solid var(--accent);border-color:var(--accent);}
   .jc-print-view{display:none;}
+  .jc-artwork-page img{display:block;margin:12px auto 0;max-width:100%;height:auto;border:1px solid var(--line);}
+  .jc-artwork-hint{color:var(--ink-soft);font-size:13px;font-style:italic;text-align:center;padding:24px 0;}
   @media print{
     .jc-field input, .jc-field select, .jc-field textarea{border:none;padding:2px 0;background:transparent;}
     .jc-field label{color:var(--ink-soft);}
+    .jc-artwork-page{page-break-after:always;}
+    .jc-artwork-page img{max-height:240mm;object-fit:contain;border:none;margin-top:8px;}
+    #jobcard-artwork-card.jc-no-artwork{display:none !important;}
   }
 
   /* ---------- print ---------- */
@@ -415,10 +420,16 @@
   <section class="tab-panel" id="tab-jobcard">
     <div class="card no-print">
       <h2><span class="n">→</span>Job card</h2>
-      <p class="hint" style="margin-top:-4px;">Fill in the details below, then print. Nothing here is sent anywhere — it stays in this browser tab. Job Card No. and Date fill in automatically for a new card; Customer/Brand and Product Name fill in automatically after you run a Compliance Check on tab 01.</p>
+      <p class="hint" style="margin-top:-4px;">Fill in the details below, then print. Nothing here is sent anywhere — it stays in this browser tab. Job Card No. and Date fill in automatically for a new card; Customer/Brand, Product Name and Pack Size fill in automatically after you run a Compliance Check on tab 01.</p>
     </div>
 
     <div id="jobcard-print-area">
+      <div class="card printable jc-artwork-page" id="jobcard-artwork-card">
+        <h2 style="font-size:17px;">Artwork</h2>
+        <img id="jobcard-artwork-img" alt="Artwork" style="display:none;">
+        <p class="jc-artwork-hint" id="jobcard-artwork-hint">No artwork uploaded yet — upload one on tab 01 or tab 03 first. It will print as page 1 of the job card, with these details following as page 2.</p>
+      </div>
+
       <div class="card printable">
         <h2 style="font-size:17px;">Job / Order Details</h2>
         <div class="jc-grid">
@@ -450,54 +461,16 @@
             </select>
           </div>
           <div class="jc-field"><label>GSM / Thickness</label><input type="text" id="jc-gsm" placeholder="e.g. 300 GSM"></div>
-          <div class="jc-field"><label>Sheet Size (L × B)</label><input type="text" id="jc-sheetsize" placeholder="e.g. 20&quot; × 30&quot;"></div>
-          <div class="jc-field"><label>No. of Ups per Sheet</label><input type="text" id="jc-ups"></div>
-          <div class="jc-field">
-            <label>Grain Direction</label>
-            <select id="jc-grain">
-              <option value="">— select —</option>
-              <option>Long grain</option>
-              <option>Short grain</option>
-              <option>Not applicable</option>
-            </select>
-          </div>
-          <div class="jc-field"><label>Paper Supplier / Brand</label><input type="text" id="jc-paper-supplier"></div>
-          <div class="jc-field"><label>Colour / Shade of Board</label><input type="text" id="jc-paper-shade" placeholder="e.g. natural white, FBB white-back"></div>
-          <div class="jc-field"><label>Paper Lot / Batch No.</label><input type="text" id="jc-paper-lot"></div>
         </div>
       </div>
 
       <div class="card printable">
         <h2 style="font-size:17px;"><span class="n">B</span>Job Operation</h2>
         <div class="jc-grid">
-          <div class="jc-field">
-            <label>Printing Process</label>
-            <select id="jc-process">
-              <option value="">— select —</option>
-              <option>Offset</option>
-              <option>Flexo</option>
-              <option>Digital</option>
-              <option>Gravure</option>
-              <option>Screen</option>
-            </select>
-          </div>
-          <div class="jc-field"><label>Printing Machine</label><input type="text" id="jc-machine"></div>
-          <div class="jc-field"><label>No. of Colours (CMYK + special)</label><input type="text" id="jc-colors" placeholder="e.g. 4C + 1 Pantone"></div>
-          <div class="jc-field"><label>Pantone / Special Colours Used</label><input type="text" id="jc-pantone"></div>
-          <div class="jc-field">
-            <label>Plate Type</label>
-            <select id="jc-plate">
-              <option value="">— select —</option>
-              <option>CTP (Computer-to-Plate)</option>
-              <option>Conventional</option>
-              <option>Photopolymer (flexo)</option>
-              <option>Not applicable</option>
-            </select>
-          </div>
-          <div class="jc-field"><label>Print Run Qty (incl. wastage %)</label><input type="text" id="jc-runqty" placeholder="e.g. 52,500 (5% wastage)"></div>
-          <div class="jc-field"><label>Proof Approved By</label><input type="text" id="jc-proofby"></div>
-          <div class="jc-field"><label>Proof Approval Date</label><input type="date" id="jc-proofdate"></div>
+          <div class="jc-field"><label>Colours — CMYK</label><input type="text" id="jc-colors" placeholder="e.g. 4C (CMYK)"></div>
+          <div class="jc-field"><label>Special Colours (Pantone No.)</label><input type="text" id="jc-pantone" placeholder="e.g. PMS 1375C"></div>
         </div>
+        <p class="hint" style="margin-top:8px;">Filled in automatically from the artwork after you run a Compliance Check on tab 01 — edit if needed.</p>
       </div>
 
       <div class="card printable">
@@ -507,44 +480,58 @@
             <label>Lamination</label>
             <select id="jc-lamination">
               <option value="">— select —</option>
-              <option>Gloss</option>
-              <option>Matte</option>
-              <option>Soft-touch</option>
-              <option>None</option>
+              <option>Yes</option>
+              <option>No</option>
             </select>
           </div>
           <div class="jc-field">
             <label>Varnish / Spot UV</label>
             <select id="jc-varnish">
               <option value="">— select —</option>
-              <option>Full varnish</option>
-              <option>Spot UV</option>
-              <option>None</option>
+              <option>Yes</option>
+              <option>No</option>
             </select>
           </div>
-          <div class="jc-field"><label>Foil Stamping (colour/area)</label><input type="text" id="jc-foil" placeholder="e.g. gold foil on logo"></div>
+          <div class="jc-field">
+            <label>Foil Stamping</label>
+            <select id="jc-foil">
+              <option value="">— select —</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
           <div class="jc-field">
             <label>Embossing / Debossing</label>
             <select id="jc-emboss">
               <option value="">— select —</option>
-              <option>Embossing</option>
-              <option>Debossing</option>
-              <option>Both</option>
-              <option>None</option>
+              <option>Yes</option>
+              <option>No</option>
             </select>
           </div>
-          <div class="jc-field"><label>Die-Cutting (die no.)</label><input type="text" id="jc-diecut"></div>
+          <div class="jc-field">
+            <label>Die-Cutting</label>
+            <select id="jc-diecut">
+              <option value="">— select —</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
           <div class="jc-field">
             <label>Pasting / Gluing</label>
             <select id="jc-pasting">
               <option value="">— select —</option>
-              <option>Straight-line gluing</option>
-              <option>Lock-bottom</option>
-              <option>Hand-pasted</option>
-              <option>Not applicable</option>
+              <option>Yes</option>
+              <option>No</option>
             </select>
           </div>
-          <div class="jc-field"><label>Window Patching</label><input type="text" id="jc-window" placeholder="e.g. PVC window, 40×20mm"></div>
+          <div class="jc-field">
+            <label>Window Patching</label>
+            <select id="jc-window">
+              <option value="">— select —</option>
+              <option>Yes</option>
+              <option>No</option>
+            </select>
+          </div>
           <div class="jc-field"><label>Packing Instructions</label><input type="text" id="jc-packing" placeholder="e.g. 50 pcs/poly bag, 500 pcs/carton"></div>
           <div class="jc-field span2"><label>Special Instructions / Remarks</label><textarea id="jc-remarks"></textarea></div>
         </div>
@@ -710,6 +697,8 @@ function loadFromDataUrl(dataUrl, mediaType, name, size, sourcePxPerMM){
     initCanvas();
   };
   img.src = dataUrl;
+
+  updateJobCardArtworkPreview();
 }
 
 /* ================= tabs ================= */
@@ -751,7 +740,9 @@ Separately, find the ingredients / composition list printed on the artwork (ofte
 
 Also find the "Marketed By" address on the artwork and transcribe just the address portion (street/plot, area, city, state, PIN — not the company name) exactly as printed, so it can be checked against a mapping service. If no Marketed By address is visible, leave this as an empty string.
 
-Also identify the brand/customer name (the brand this product is sold under — usually the most prominent name on the front of pack, or the company name in the "Marketed By" line if that's clearer) and the product name (the specific product name/variant, excluding the brand name). Leave either as an empty string if not clearly identifiable.${crossCheckBlock}
+Also identify the brand/customer name (the brand this product is sold under — usually the most prominent name on the front of pack, or the company name in the "Marketed By" line if that's clearer), the product name (the specific product name/variant, excluding the brand name), and the pack size / net content exactly as printed (e.g. "100 ml", "50 g", "8 ml"). Leave any of these as an empty string if not clearly identifiable.
+
+Also assess the print colours: state the process colours used as CMYK notation (e.g. "4C (CMYK)") based on what the artwork visually appears to use, and separately look specifically for any Pantone/PMS colour codes printed anywhere on the artwork (e.g. in a colour bar, registration marks, or spec notes near the edge of the file) and list exactly what's printed. If no Pantone/PMS code is visible anywhere on the artwork, leave that field as an empty string rather than guessing one.${crossCheckBlock}
 
 Respond with ONLY raw JSON (no markdown code fences, no commentary before or after), exactly in this shape:
 {
@@ -768,6 +759,9 @@ Respond with ONLY raw JSON (no markdown code fences, no commentary before or aft
   "marketed_by_address": "<address portion only, exactly as printed, or empty string if none visible>",
   "brand_name": "<brand/customer name, or empty string if unclear>",
   "product_name": "<product name/variant, or empty string if unclear>",
+  "pack_size": "<pack size / net content exactly as printed, e.g. '100 ml', or empty string if unclear>",
+  "colors_cmyk": "<process colours used, e.g. '4C (CMYK)', based on visual assessment>",
+  "pantone_numbers": "<any Pantone/PMS code(s) explicitly printed on the artwork, comma-separated, or empty string if none visible>",
   "overall_summary": "<2-3 sentence plain-language summary of the artwork's compliance state and biggest issues, or confirmation it looks clean>"${jsonKeysBlock}
 }
 Include one checklist entry per rule listed above, in the same order. If a field cannot be verified from the image, use status "unclear" and say why in the note. If there are no spelling or grammar errors, return empty arrays for those. If no ingredients list is visible on the artwork, return an empty array for ingredients_printed.`;
@@ -1035,14 +1029,20 @@ function renderResults(parsed){
   wrap.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
-/* Pulls brand/product name picked up from the artwork into the Job Card tab, formulation code too. */
+/* Pulls brand/product name/pack size picked up from the artwork into the Job Card tab, formulation code too. */
 function applyArtworkToJobCard(parsed){
   const formulationCode = document.getElementById('formulation-code').value.trim();
   const jcCustomer = document.getElementById('jc-customer');
   const jcProduct = document.getElementById('jc-product');
+  const jcPacksize = document.getElementById('jc-packsize');
+  const jcColors = document.getElementById('jc-colors');
+  const jcPantone = document.getElementById('jc-pantone');
   const jcFormcode = document.getElementById('jc-formcode');
   if(jcCustomer && parsed.brand_name) jcCustomer.value = parsed.brand_name;
   if(jcProduct && parsed.product_name) jcProduct.value = parsed.product_name;
+  if(jcPacksize && parsed.pack_size) jcPacksize.value = parsed.pack_size;
+  if(jcColors && parsed.colors_cmyk) jcColors.value = parsed.colors_cmyk;
+  if(jcPantone && parsed.pantone_numbers) jcPantone.value = parsed.pantone_numbers;
   if(jcFormcode && formulationCode && !jcFormcode.value) jcFormcode.value = formulationCode;
   if(typeof saveJobCardDraft === 'function') saveJobCardDraft();
 }
@@ -1576,8 +1576,8 @@ async function renderCompareResults(parsed){
 /* ================= job card ================= */
 const JOBCARD_FIELD_IDS = [
   'jc-jobno','jc-date','jc-customer','jc-product','jc-formcode','jc-packsize','jc-qty','jc-delivery',
-  'jc-paper-type','jc-gsm','jc-sheetsize','jc-ups','jc-grain','jc-paper-supplier','jc-paper-shade','jc-paper-lot',
-  'jc-process','jc-machine','jc-colors','jc-pantone','jc-plate','jc-runqty','jc-proofby','jc-proofdate',
+  'jc-paper-type','jc-gsm',
+  'jc-colors','jc-pantone',
   'jc-lamination','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window','jc-packing','jc-remarks'
 ];
 const JOBCARD_STORAGE_KEY = 'artworkqc_jobcard_draft';
@@ -1619,6 +1619,26 @@ function todayISO(){
   const d = new Date();
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
+
+/* ---- artwork preview, used as printed page 1 of the job card ---- */
+function updateJobCardArtworkPreview(){
+  const card = document.getElementById('jobcard-artwork-card');
+  const img = document.getElementById('jobcard-artwork-img');
+  const hint = document.getElementById('jobcard-artwork-hint');
+  if(!card || !img || !hint) return;
+  if(uploadedFile && uploadedFile.dataUrl){
+    img.src = uploadedFile.dataUrl;
+    img.style.display='block';
+    hint.style.display='none';
+    card.classList.remove('jc-no-artwork');
+  } else {
+    img.removeAttribute('src');
+    img.style.display='none';
+    hint.style.display='block';
+    card.classList.add('jc-no-artwork');
+  }
+}
+updateJobCardArtworkPreview();
 
 loadJobCardDraft();
 // Fresh form (no saved job no. yet): assign the next sequence number and today's date.
