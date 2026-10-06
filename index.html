@@ -385,6 +385,7 @@
               <div class="file-name" id="compare-name-a"></div>
               <div class="file-meta" id="compare-meta-a"></div>
             </div>
+            <button class="secondary" id="compare-change-btn-a" type="button">Change</button>
           </div>
         </div>
         <div style="flex:1;min-width:220px;">
@@ -399,6 +400,7 @@
               <div class="file-name" id="compare-name-b"></div>
               <div class="file-meta" id="compare-meta-b"></div>
             </div>
+            <button class="secondary" id="compare-change-btn-b" type="button">Change</button>
           </div>
         </div>
       </div>
@@ -1481,6 +1483,8 @@ function wireCompareDropzone(dzId, inputId, which){
 }
 wireCompareDropzone('compare-dropzone-a','compare-file-a','a');
 wireCompareDropzone('compare-dropzone-b','compare-file-b','b');
+document.getElementById('compare-change-btn-a').addEventListener('click', ()=>document.getElementById('compare-file-a').click());
+document.getElementById('compare-change-btn-b').addEventListener('click', ()=>document.getElementById('compare-file-b').click());
 
 async function handleCompareFile(file, which){
   try{
