@@ -190,9 +190,11 @@
     .jc-field select{background-image:none;}
     .jc-field textarea{resize:none;min-height:26px;overflow:hidden;}
     .jc-field label{color:var(--ink-soft);}
-    .jc-artwork-page{page-break-after:always;}
+    /* The page has a standard 12mm @page margin (see below) everywhere except this one page: pulling it out by
+       the same 7mm on every side leaves only ~5mm from the physical paper edge, as close as a printer safely allows,
+       so the artwork can fill nearly the whole sheet without the rest of the document looking edge-to-edge. */
+    .jc-artwork-page{page-break-after:always;margin:-7mm -7mm 0 -7mm;}
     .jc-artwork-page h2{font-size:10px;margin:0 0 2mm;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-soft);}
-    /* Content box after the 5mm @page margin on A4 is 200mm x 287mm; reserve a little for the heading. */
     .jc-artwork-page img{display:block;margin:0 auto;width:200mm;height:280mm;object-fit:contain;border:none;}
     #jobcard-artwork-card.jc-no-artwork{display:none !important;}
   }
@@ -200,7 +202,7 @@
   /* ---------- print ---------- */
   .no-print{}
   @media print{
-    @page{ size: A4; margin: 5mm; }
+    @page{ size: A4; margin: 12mm; }
     body{background:#fff;}
     .no-print{display:none !important;}
     .masthead{display:none !important;}
