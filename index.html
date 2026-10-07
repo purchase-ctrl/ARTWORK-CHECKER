@@ -642,6 +642,7 @@ if(window.pdfjsLib){
 }
 let currentPdfDoc = null;   // pdfjs document, kept so the user can switch pages
 let currentPdfFileMeta = null; // {name}
+let currentPdfBytes = null; // raw ArrayBuffer of the loaded PDF, kept so measurement can re-render at higher resolution
 
 /* ================= rules reference list ================= */
 const rulesList = document.getElementById('rules-list');
@@ -707,6 +708,9 @@ function handleFile(file){
   const reader = new FileReader();
   reader.onload = async ()=>{
     try{
+      // keep an untouched copy for later high-resolution re-renders — pdf.js may transfer/detach
+      // the buffer it's given to its worker, so this copy must be made before that call.
+      currentPdfBytes = reader.result.slice(0);
       const typedArray = new Uint8Array(reader.result);
       const pdfDoc = await pdfjsLib.getDocument({data: typedArray}).promise;
       currentPdfDoc = pdfDoc;
@@ -745,15 +749,15 @@ async function renderPdfPage(pageNum){
   // PDF points are an exact physical unit: 1 pt = 1/72 inch = 25.4/72 mm.
   // Rendered pixels are RENDER_SCALE per point, so this gives an exact px-per-mm.
   const sourcePxPerMM = PDF_RENDER_SCALE * 72 / 25.4;
-  loadFromDataUrl(dataUrl, 'image/png', currentPdfFileMeta.name + ' (page '+pageNum+')', approxSize, sourcePxPerMM);
+  loadFromDataUrl(dataUrl, 'image/png', currentPdfFileMeta.name + ' (page '+pageNum+')', approxSize, sourcePxPerMM, currentPdfBytes, pageNum);
 }
 
 pdfPageSelect.addEventListener('change', ()=>{
   renderPdfPage(parseInt(pdfPageSelect.value,10));
 });
 
-function loadFromDataUrl(dataUrl, mediaType, name, size, sourcePxPerMM){
-  uploadedFile = {dataUrl, mediaType, name, size, sourcePxPerMM: sourcePxPerMM || null};
+function loadFromDataUrl(dataUrl, mediaType, name, size, sourcePxPerMM, pdfBytes, pdfPageNum){
+  uploadedFile = {dataUrl, mediaType, name, size, sourcePxPerMM: sourcePxPerMM || null, pdfBytes: pdfBytes || null, pdfPageNum: pdfPageNum || 1};
   dropzone.style.display='none';
   fileRow.style.display='flex';
   fileThumb.src = dataUrl;
@@ -1504,6 +1508,9 @@ async function processFile(file){
     reader.onerror = ()=>reject(new Error('Could not read that PDF.'));
     reader.readAsArrayBuffer(file);
   });
+  // keep an untouched copy for later high-resolution re-renders — pdf.js may transfer/detach the
+  // buffer it's given to its worker, so this copy must be made before that call.
+  const pdfBytesCopy = arrayBuffer.slice(0);
   const pdfDoc = await pdfjsLib.getDocument({data: new Uint8Array(arrayBuffer)}).promise;
   const page = await pdfDoc.getPage(1);
   const viewport = page.getViewport({scale: PDF_RENDER_SCALE});
@@ -1517,7 +1524,8 @@ async function processFile(file){
   return {
     dataUrl, mediaType: 'image/png',
     name: file.name + (pdfDoc.numPages>1 ? ' (page 1)' : ''),
-    size: approxSize, sourcePxPerMM
+    size: approxSize, sourcePxPerMM,
+    pdfBytes: pdfBytesCopy, pdfPageNum: 1
   };
 }
 
@@ -1704,7 +1712,8 @@ function clusterLineCandidates(cands, keyName){
    top to bottom) plus a vertical line (Height). */
 async function detectBlueDimensionLinesMM(file){
   if(!file || !file.sourcePxPerMM) return null;
-  const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
+  const { ctx, width, height, pxPerMM } = await getMeasurementCanvas(file);
+  if(!pxPerMM) return null;
   const imageData = ctx.getImageData(0,0,width,height);
   const data = imageData.data;
   const mask = new Uint8Array(width*height);
@@ -1715,7 +1724,7 @@ async function detectBlueDimensionLinesMM(file){
   }
   if(!any) return null;
 
-  const minLineLenPx = Math.max(20, Math.round(file.sourcePxPerMM*3)); // ignore short runs (label text strokes)
+  const minLineLenPx = Math.max(20, Math.round(pxPerMM*3)); // ignore short runs (label text strokes)
 
   const hCandidates = [];
   for(let y=0;y<height;y++){
@@ -1733,7 +1742,6 @@ async function detectBlueDimensionLinesMM(file){
 
   if(hLines.length<2 || vLines.length<1) return null;
 
-  const pxPerMM = file.sourcePxPerMM;
   return {
     lengthMM: hLines[0].len/pxPerMM,
     breadthMM: hLines[1].len/pxPerMM,
@@ -1743,9 +1751,10 @@ async function detectBlueDimensionLinesMM(file){
 
 async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
   if(!file || !file.sourcePxPerMM) return null;
-  const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
+  const { ctx, width, height, pxPerMM } = await getMeasurementCanvas(file);
+  if(!pxPerMM) return null;
   const full = ctx.getImageData(0,0,width,height);
-  const bbox = findFirstIslandBoundingBox(full, width, height, file.sourcePxPerMM);
+  const bbox = findFirstIslandBoundingBox(full, width, height, pxPerMM);
   if(!bbox) return null;
 
   const divAcross = repeatsAcross && repeatsAcross>0 ? repeatsAcross : 1;
@@ -1803,7 +1812,6 @@ async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
   }
   if(bestGap<=0) return null;
 
-  const pxPerMM = file.sourcePxPerMM;
   return {
     lengthMM: lengthPx/pxPerMM,
     breadthMM: breadthPx/pxPerMM,
@@ -1907,6 +1915,29 @@ async function getImageDataFromDataUrl(dataUrl){
   return { imageData: ctx.getImageData(0,0,width,height), width, height };
 }
 
+/* Measurement needs much finer detail than the on-screen/AI-analysis render (thin die-line
+   strokes can otherwise fall below detection thresholds and vanish or get mis-clustered) — so
+   when the artwork's original PDF bytes are available, this re-renders just that page at a much
+   higher resolution purely for measuring, independent of the display render used elsewhere.
+   Falls back to the existing (lower-res) rendered image for plain uploaded images, which have no
+   PDF to re-render and no real physical scale anyway. */
+const MEASURE_RENDER_SCALE = 6;
+async function getMeasurementCanvas(file){
+  if(file && file.pdfBytes){
+    const pdfDoc = await pdfjsLib.getDocument({data: new Uint8Array(file.pdfBytes.slice(0))}).promise;
+    const page = await pdfDoc.getPage(file.pdfPageNum || 1);
+    const viewport = page.getViewport({scale: MEASURE_RENDER_SCALE});
+    const canvas = document.createElement('canvas');
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({canvasContext: canvas.getContext('2d'), viewport}).promise;
+    const ctx = canvas.getContext('2d');
+    return { ctx, width: canvas.width, height: canvas.height, pxPerMM: MEASURE_RENDER_SCALE * 72 / 25.4 };
+  }
+  const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
+  return { ctx, width, height, pxPerMM: file.sourcePxPerMM || null };
+}
+
 function findContentBoundingBox(imageData, width, height){
   const data = imageData.data;
   const whiteThreshold = 248, alphaThreshold = 10;
@@ -1998,14 +2029,16 @@ function findFirstIslandBoundingBox(imageData, width, height, pxPerMM){
 
 async function getDesignSizeMM(file, repeatsAcross, repeatsDown){
   if(!file.sourcePxPerMM) return null;
-  const { imageData, width, height } = await getImageDataFromDataUrl(file.dataUrl);
-  const bbox = findFirstIslandBoundingBox(imageData, width, height, file.sourcePxPerMM);
+  const { ctx, width, height, pxPerMM } = await getMeasurementCanvas(file);
+  if(!pxPerMM) return null;
+  const imageData = ctx.getImageData(0,0,width,height);
+  const bbox = findFirstIslandBoundingBox(imageData, width, height, pxPerMM);
   if(!bbox) return null;
   const divAcross = repeatsAcross && repeatsAcross>0 ? repeatsAcross : 1;
   const divDown = repeatsDown && repeatsDown>0 ? repeatsDown : 1;
   return {
-    wMM: (bbox.width / file.sourcePxPerMM) / divAcross,
-    hMM: (bbox.height / file.sourcePxPerMM) / divDown
+    wMM: (bbox.width / pxPerMM) / divAcross,
+    hMM: (bbox.height / pxPerMM) / divDown
   };
 }
 
