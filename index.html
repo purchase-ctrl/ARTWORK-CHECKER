@@ -500,7 +500,7 @@
 
       <div class="card printable">
         <h2 style="font-size:17px;">Box Dimensions</h2>
-        <p class="hint no-print" style="margin-top:-4px;">Filled in automatically by measuring the printed die-line/crease grid pixel-for-pixel (Front/Back panel width = Length, Side panel width = Breadth, main panel row = Height), falling back to the artwork's own blue measurement lines if no die-line grid is found — adjust if needed. Only PDFs carry real physical scale.</p>
+        <p class="hint no-print" style="margin-top:-4px;">Filled in automatically by measuring the printed die-line/crease grid pixel-for-pixel (Front/Back panel width = Length, Side panel width = Breadth, main panel row = Height) — first looking for the vivid red die-line ink, then for plain black crease lines if no red is found — falling back to the artwork's own blue measurement lines if no grid is found at all. Adjust if needed. Only PDFs carry real physical scale.</p>
         <div class="hint no-print" id="jc-dims-status" style="margin-top:-4px;"></div>
         <div class="jc-grid">
           <div class="jc-field"><label>Length (mm)</label><input type="number" step="any" min="0" id="jc-length" placeholder="auto from artwork"></div>
@@ -788,12 +788,23 @@ async function autofillJobCardDimensions(){
     return;
   }
   try{
-    const panels = await detectCartonPanelsMM(uploadedFile, 1, 1);
+    const panels = await detectCartonPanelsMM(uploadedFile, 1, 1, false);
     if(panels){
       document.getElementById('jc-length').value = panels.lengthMM.toFixed(1);
       document.getElementById('jc-breadth').value = panels.breadthMM.toFixed(1);
       document.getElementById('jc-height').value = panels.heightMM.toFixed(1);
       if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found, measured pixel-for-pixel at full resolution) — please double-check against the spec.';
+      saveJobCardDraft();
+      return;
+    }
+  }catch(e){ /* fall through to the black-crease pass below */ }
+  try{
+    const panels = await detectCartonPanelsMM(uploadedFile, 1, 1, true);
+    if(panels){
+      document.getElementById('jc-length').value = panels.lengthMM.toFixed(1);
+      document.getElementById('jc-breadth').value = panels.breadthMM.toFixed(1);
+      document.getElementById('jc-height').value = panels.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s crease/cut-line grid (' + panels.panelsDetected + ' panels found, measured pixel-for-pixel at full resolution) — please double-check against the spec.';
       saveJobCardDraft();
       return;
     }
@@ -1573,12 +1584,23 @@ async function autofillMonocartonSize(){
   const repDown = parseInt(document.getElementById('ms-mono-rep-down').value, 10) || 1;
   const statusEl = document.getElementById('ms-autofill-status');
   try{
-    const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown);
+    const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown, false);
     if(panels){
       document.getElementById('ms-mono-l').value = panels.lengthMM.toFixed(1);
       document.getElementById('ms-mono-b').value = panels.breadthMM.toFixed(1);
       document.getElementById('ms-mono-h').value = panels.heightMM.toFixed(1);
       if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found, measured pixel-for-pixel at full resolution) — please double-check these against the spec.';
+      updatePackCalcPreview();
+      return;
+    }
+  }catch(e){ /* fall through to the black-crease pass below */ }
+  try{
+    const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown, true);
+    if(panels){
+      document.getElementById('ms-mono-l').value = panels.lengthMM.toFixed(1);
+      document.getElementById('ms-mono-b').value = panels.breadthMM.toFixed(1);
+      document.getElementById('ms-mono-h').value = panels.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s crease/cut-line grid (' + panels.panelsDetected + ' panels found, measured pixel-for-pixel at full resolution) — please double-check these against the spec.';
       updatePackCalcPreview();
       return;
     }
@@ -1612,7 +1634,15 @@ function isDielineColor(r,g,b){
   return r>170 && g<95 && b<115 && (r-g)>95 && (r-b)>75;
 }
 
-function buildDielineMask(imageData, width, height){
+/* A thin, neutral (near-black/grey, not a colored ink) stroke — the other common way a carton's
+   cut/crease lines are printed, when the artwork doesn't use the vivid red die-line convention. */
+function isNeutralDarkLineColor(r,g,b){
+  const lum = 0.299*r + 0.587*g + 0.114*b;
+  const maxc = Math.max(r,g,b), minc = Math.min(r,g,b);
+  return lum<80 && (maxc-minc)<40;
+}
+
+function buildDielineMask(imageData, width, height, includeDark){
   const data = imageData.data;
   const mask = new Uint8Array(width*height);
   for(let y=0;y<height;y++){
@@ -1620,7 +1650,8 @@ function buildDielineMask(imageData, width, height){
     for(let x=0;x<width;x++){
       const i = rowOffset + x*4;
       if(data[i+3]<=10) continue;
-      if(isDielineColor(data[i],data[i+1],data[i+2])) mask[y*width+x]=1;
+      const r=data[i], g=data[i+1], b=data[i+2];
+      if(isDielineColor(r,g,b) || (includeDark && isNeutralDarkLineColor(r,g,b))) mask[y*width+x]=1;
     }
   }
   return mask;
@@ -1749,7 +1780,7 @@ async function detectBlueDimensionLinesMM(file){
   };
 }
 
-async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
+async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown, includeDark){
   if(!file || !file.sourcePxPerMM) return null;
   const { ctx, width, height, pxPerMM } = await getMeasurementCanvas(file);
   if(!pxPerMM) return null;
@@ -1764,7 +1795,7 @@ async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
   if(cellW<40 || cellH<40) return null;
 
   const imageData = ctx.getImageData(bbox.minX, bbox.minY, cellW, cellH);
-  const mask = buildDielineMask(imageData, cellW, cellH);
+  const mask = buildDielineMask(imageData, cellW, cellH, includeDark);
   if(!mask.some(v=>v)) return null; // no die-line-colored ink found — nothing to detect
 
   const colDensity = new Float32Array(cellW);
