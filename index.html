@@ -105,6 +105,8 @@
   button:disabled{opacity:.4;cursor:not-allowed;}
   button.small{padding:5px 10px;font-size:12px;}
   .btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+  .joblog-actions{display:flex;gap:6px;flex-wrap:wrap;}
+  .joblog-actions button{white-space:nowrap;}
   select, input[type=number]{
     font-family:var(--sans);font-size:13px;padding:8px 10px;border:1px solid var(--line);background:var(--card);
   }
@@ -263,6 +265,7 @@
     <button class="tab-btn" data-tab="measure">02 · Measurement Tool</button>
     <button class="tab-btn" data-tab="compare">03 · Monocarton vs Inner</button>
     <button class="tab-btn" data-tab="jobcard">04 · Job Card</button>
+    <button class="tab-btn" data-tab="joblog">05 · Job Card Log</button>
   </nav>
 
   <!-- ============ COMPLIANCE TAB ============ -->
@@ -610,8 +613,25 @@
       </div>
     </div>
     <div class="btn-row no-print" style="margin-top:-6px;">
+      <button id="jobcard-savelog-btn">Save to Log</button>
       <button id="jobcard-print-btn" class="secondary">Print Job Card</button>
       <button id="jobcard-clear-btn" class="ghost">Clear Form</button>
+    </div>
+    <div class="hint no-print" id="jc-save-status" style="margin-top:6px;"></div>
+  </section>
+
+  <!-- ============ JOB CARD LOG TAB ============ -->
+  <section class="tab-panel" id="tab-joblog">
+    <div class="card no-print">
+      <h2><span class="n">→</span>Job card log</h2>
+      <p class="hint" style="margin-top:-4px;">Every job card you click “Save to Log” for is listed here, newest first. Nothing here is sent anywhere — it stays in this browser only, so it won’t show up on another computer or browser. The artwork image itself isn’t stored in the log (to keep things light) — only the form details; re-upload the artwork if you reopen a job card for printing.</p>
+    </div>
+    <div class="card no-print">
+      <table>
+        <thead><tr><th style="width:12%;">Date</th><th style="width:16%;">Job No.</th><th style="width:24%;">Brand Name</th><th style="width:24%;">Product Name</th><th>Actions</th></tr></thead>
+        <tbody id="joblog-tbody"></tbody>
+      </table>
+      <p class="hint" id="joblog-empty" style="display:none;margin-top:10px;">No job cards saved to the log yet — fill in a job card on tab 04 and click “Save to Log”.</p>
     </div>
   </section>
 
@@ -838,6 +858,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    if(btn.dataset.tab==='joblog' && typeof renderJobLogTable==='function') renderJobLogTable();
   });
 });
 
@@ -2385,7 +2406,122 @@ document.getElementById('jobcard-clear-btn').addEventListener('click', ()=>{
   jcDateEl.value = todayISO();
   updateAllYesNoColors();
   saveJobCardDraft();
+  jcEditingLogId = null;
+  setJobCardReadOnly(false);
+  const statusEl = document.getElementById('jc-save-status');
+  if(statusEl) statusEl.textContent = '';
 });
+
+/* ================= job card log ================= */
+const JOBLOG_KEY = 'artworkqc_jobcard_log';
+let jcEditingLogId = null; // set while viewing/editing a saved log entry, so "Save to Log" updates it instead of adding a new row
+
+function loadJobLog(){
+  try{ return JSON.parse(localStorage.getItem(JOBLOG_KEY) || '[]'); }catch(e){ return []; }
+}
+function saveJobLogArray(arr){
+  try{ localStorage.setItem(JOBLOG_KEY, JSON.stringify(arr)); }catch(e){ /* storage full or unavailable — log just won't persist */ }
+}
+
+function setJobCardReadOnly(readOnly){
+  JOBCARD_FIELD_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.disabled = readOnly;
+  });
+  const saveBtn = document.getElementById('jobcard-savelog-btn');
+  if(saveBtn) saveBtn.disabled = readOnly;
+}
+
+function saveCurrentJobCardToLog(){
+  const data = {};
+  JOBCARD_FIELD_IDS.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) data[id] = el.value;
+  });
+  const log = loadJobLog();
+  if(jcEditingLogId){
+    const idx = log.findIndex(r=>r.id===jcEditingLogId);
+    if(idx>=0) log[idx].data = data;
+    else log.push({ id: jcEditingLogId, savedAt: todayISO(), data });
+  } else {
+    jcEditingLogId = 'jc_' + Date.now() + '_' + Math.random().toString(36).slice(2,7);
+    log.push({ id: jcEditingLogId, savedAt: todayISO(), data });
+  }
+  saveJobLogArray(log);
+  renderJobLogTable();
+  const statusEl = document.getElementById('jc-save-status');
+  if(statusEl) statusEl.textContent = 'Saved to the Job Card Log as ' + (data['jc-jobno'] || '(no job no.)') + '.';
+}
+
+function loadJobCardFromLog(id, readOnly){
+  const rec = loadJobLog().find(r=>r.id===id);
+  if(!rec) return;
+  JOBCARD_FIELD_IDS.forEach(id2=>{
+    const el = document.getElementById(id2);
+    if(el) el.value = rec.data && rec.data[id2] !== undefined ? rec.data[id2] : '';
+  });
+  updateAllYesNoColors();
+  jcEditingLogId = id;
+  setJobCardReadOnly(readOnly);
+  const statusEl = document.getElementById('jc-save-status');
+  const jobNoLabel = (rec.data && rec.data['jc-jobno']) || '(no job no.)';
+  if(statusEl) statusEl.textContent = readOnly
+    ? ('Viewing saved job card ' + jobNoLabel + ' — fields are locked. Use Edit from the Log tab to change it, or Clear Form to start a new one.')
+    : ('Editing saved job card ' + jobNoLabel + ' — click Save to Log to update it.');
+  const jobcardTabBtn = document.querySelector('.tab-btn[data-tab="jobcard"]');
+  if(jobcardTabBtn) jobcardTabBtn.click();
+}
+
+function deleteJobCardFromLog(id){
+  if(!confirm('Delete this job card from the log? This cannot be undone.')) return;
+  const log = loadJobLog().filter(r=>r.id!==id);
+  saveJobLogArray(log);
+  if(jcEditingLogId===id){
+    jcEditingLogId = null;
+    setJobCardReadOnly(false);
+  }
+  renderJobLogTable();
+}
+
+function renderJobLogTable(){
+  const tbody = document.getElementById('joblog-tbody');
+  const emptyEl = document.getElementById('joblog-empty');
+  if(!tbody) return;
+  const log = loadJobLog().slice().sort((a,b)=> (b.savedAt||'').localeCompare(a.savedAt||'') || (b.id||'').localeCompare(a.id||''));
+  tbody.innerHTML = '';
+  if(!log.length){
+    if(emptyEl) emptyEl.style.display='block';
+    return;
+  }
+  if(emptyEl) emptyEl.style.display='none';
+  log.forEach(rec=>{
+    const d = rec.data || {};
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(d['jc-date']||'—')}</td>
+      <td style="font-family:var(--mono);">${escapeHtml(d['jc-jobno']||'—')}</td>
+      <td>${escapeHtml(d['jc-customer']||'—')}</td>
+      <td>${escapeHtml(d['jc-product']||'—')}</td>
+      <td class="joblog-actions">
+        <button class="ghost small joblog-view-btn" data-id="${rec.id}">View</button>
+        <button class="ghost small joblog-edit-btn" data-id="${rec.id}">Edit</button>
+        <button class="ghost small joblog-delete-btn" data-id="${rec.id}">Delete</button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+document.getElementById('jobcard-savelog-btn').addEventListener('click', saveCurrentJobCardToLog);
+document.getElementById('joblog-tbody').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  if(btn.classList.contains('joblog-view-btn')) loadJobCardFromLog(id, true);
+  else if(btn.classList.contains('joblog-edit-btn')) loadJobCardFromLog(id, false);
+  else if(btn.classList.contains('joblog-delete-btn')) deleteJobCardFromLog(id);
+});
+
+renderJobLogTable();
 </script>
 </body>
 </html>
