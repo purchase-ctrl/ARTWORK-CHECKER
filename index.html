@@ -422,7 +422,7 @@
 
     <div class="card no-print">
       <h2><span class="n">→</span>Pack size calculator</h2>
-      <p class="hint" style="margin-top:-4px;">Monocarton L, B &amp; H fill in automatically once the artwork is uploaded as a PDF: it first looks for the artwork's own blue measurement lines (Length/Breadth/Height drawn as straight rulers), then falls back to reading the printed die-line/crease grid (Front/Back panel width = Length, Side panel width = Breadth, main-row height = Height), then to the full design size for L &amp; B only — adjust any value if needed. Only PDFs carry real physical scale; a plain image can't auto-measure. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
+      <p class="hint" style="margin-top:-4px;">Monocarton L, B &amp; H fill in automatically once the artwork is uploaded as a PDF: it measures the printed die-line/crease grid pixel-for-pixel (Front/Back panel width = Length, Side panel width = Breadth, main-row height = Height), falling back to the artwork's own blue measurement lines if no die-line grid is found, then to the full design size for L &amp; B only — adjust any value if needed. Only PDFs carry real physical scale; a plain image can't auto-measure. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
       <div class="hint" id="ms-autofill-status" style="margin-top:-4px;"></div>
       <div class="jc-grid">
         <div class="jc-field"><label>Monocarton L (mm)</label><input type="number" step="any" min="0" id="ms-mono-l" placeholder="auto from artwork"></div>
@@ -500,7 +500,7 @@
 
       <div class="card printable">
         <h2 style="font-size:17px;">Box Dimensions</h2>
-        <p class="hint no-print" style="margin-top:-4px;">Filled in automatically: first from the artwork's own blue measurement lines (Length/Breadth/Height), then from its printed die-line/crease grid (Front/Back panel width = Length, Side panel width = Breadth, main panel row = Height) if there are no blue lines — adjust if needed. Only PDFs carry real physical scale.</p>
+        <p class="hint no-print" style="margin-top:-4px;">Filled in automatically by measuring the printed die-line/crease grid pixel-for-pixel (Front/Back panel width = Length, Side panel width = Breadth, main panel row = Height), falling back to the artwork's own blue measurement lines if no die-line grid is found — adjust if needed. Only PDFs carry real physical scale.</p>
         <div class="hint no-print" id="jc-dims-status" style="margin-top:-4px;"></div>
         <div class="jc-grid">
           <div class="jc-field"><label>Length (mm)</label><input type="number" step="any" min="0" id="jc-length" placeholder="auto from artwork"></div>
@@ -784,23 +784,23 @@ async function autofillJobCardDimensions(){
     return;
   }
   try{
+    const panels = await detectCartonPanelsMM(uploadedFile, 1, 1);
+    if(panels){
+      document.getElementById('jc-length').value = panels.lengthMM.toFixed(1);
+      document.getElementById('jc-breadth').value = panels.breadthMM.toFixed(1);
+      document.getElementById('jc-height').value = panels.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found, measured pixel-for-pixel at full resolution) — please double-check against the spec.';
+      saveJobCardDraft();
+      return;
+    }
+  }catch(e){ /* fall through to blue-line detection below */ }
+  try{
     const blue = await detectBlueDimensionLinesMM(uploadedFile);
     if(blue){
       document.getElementById('jc-length').value = blue.lengthMM.toFixed(1);
       document.getElementById('jc-breadth').value = blue.breadthMM.toFixed(1);
       document.getElementById('jc-height').value = blue.heightMM.toFixed(1);
       if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s blue measurement lines — please double-check against the spec.';
-      saveJobCardDraft();
-      return;
-    }
-  }catch(e){ /* fall through to die-line panel detection below */ }
-  try{
-    const panels = await detectCartonPanelsMM(uploadedFile, 1, 1);
-    if(panels){
-      document.getElementById('jc-length').value = panels.lengthMM.toFixed(1);
-      document.getElementById('jc-breadth').value = panels.breadthMM.toFixed(1);
-      document.getElementById('jc-height').value = panels.heightMM.toFixed(1);
-      if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found) — please double-check against the spec.';
       saveJobCardDraft();
       return;
     }
@@ -1565,23 +1565,23 @@ async function autofillMonocartonSize(){
   const repDown = parseInt(document.getElementById('ms-mono-rep-down').value, 10) || 1;
   const statusEl = document.getElementById('ms-autofill-status');
   try{
+    const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown);
+    if(panels){
+      document.getElementById('ms-mono-l').value = panels.lengthMM.toFixed(1);
+      document.getElementById('ms-mono-b').value = panels.breadthMM.toFixed(1);
+      document.getElementById('ms-mono-h').value = panels.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found, measured pixel-for-pixel at full resolution) — please double-check these against the spec.';
+      updatePackCalcPreview();
+      return;
+    }
+  }catch(e){ /* fall through to blue-line detection below */ }
+  try{
     const blue = await detectBlueDimensionLinesMM(compareFileA);
     if(blue){
       document.getElementById('ms-mono-l').value = blue.lengthMM.toFixed(1);
       document.getElementById('ms-mono-b').value = blue.breadthMM.toFixed(1);
       document.getElementById('ms-mono-h').value = blue.heightMM.toFixed(1);
       if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s blue measurement lines — please double-check these against the spec.';
-      updatePackCalcPreview();
-      return;
-    }
-  }catch(e){ /* fall through to die-line panel detection below */ }
-  try{
-    const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown);
-    if(panels){
-      document.getElementById('ms-mono-l').value = panels.lengthMM.toFixed(1);
-      document.getElementById('ms-mono-b').value = panels.breadthMM.toFixed(1);
-      document.getElementById('ms-mono-h').value = panels.heightMM.toFixed(1);
-      if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found) — please double-check these against the spec.';
       updatePackCalcPreview();
       return;
     }
