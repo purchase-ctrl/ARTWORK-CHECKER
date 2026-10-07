@@ -2438,6 +2438,7 @@ function saveCurrentJobCardToLog(){
     const el = document.getElementById(id);
     if(el) data[id] = el.value;
   });
+  const wasNewEntry = !jcEditingLogId;
   const log = loadJobLog();
   if(jcEditingLogId){
     const idx = log.findIndex(r=>r.id===jcEditingLogId);
@@ -2450,7 +2451,25 @@ function saveCurrentJobCardToLog(){
   saveJobLogArray(log);
   renderJobLogTable();
   const statusEl = document.getElementById('jc-save-status');
-  if(statusEl) statusEl.textContent = 'Saved to the Job Card Log as ' + (data['jc-jobno'] || '(no job no.)') + '.';
+  const savedJobNo = data['jc-jobno'] || '(no job no.)';
+
+  if(wasNewEntry){
+    // Freshly-saved job card (not an update to an existing log row) — move straight on to the
+    // next job card, with the next Job No. in the sequence filled in automatically.
+    JOBCARD_FIELD_IDS.forEach(id=>{
+      const el = document.getElementById(id);
+      if(el) el.value='';
+    });
+    jcJobnoEl.value = nextJobCardNo();
+    jcDateEl.value = todayISO();
+    updateAllYesNoColors();
+    jcEditingLogId = null;
+    setJobCardReadOnly(false);
+    saveJobCardDraft();
+    if(statusEl) statusEl.textContent = 'Saved as ' + savedJobNo + ' — ready for the next job card (' + jcJobnoEl.value + ').';
+  } else {
+    if(statusEl) statusEl.textContent = 'Saved to the Job Card Log as ' + savedJobNo + '.';
+  }
 }
 
 function loadJobCardFromLog(id, readOnly){
