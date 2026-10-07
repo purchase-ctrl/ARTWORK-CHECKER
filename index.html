@@ -422,7 +422,7 @@
 
     <div class="card no-print">
       <h2><span class="n">→</span>Pack size calculator</h2>
-      <p class="hint" style="margin-top:-4px;">Monocarton L, B &amp; H fill in automatically once the artwork is uploaded as a PDF, by finding its printed die-line/crease grid and reading the Front/Back panel width (Length), Side panel width (Breadth) and main-row height (Height) — adjust any value if needed. If no die-line grid can be found, L &amp; B fall back to the full design size and H is left for manual entry. Only PDFs carry real physical scale; a plain image can't auto-measure. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
+      <p class="hint" style="margin-top:-4px;">Monocarton L, B &amp; H fill in automatically once the artwork is uploaded as a PDF: it first looks for the artwork's own blue measurement lines (Length/Breadth/Height drawn as straight rulers), then falls back to reading the printed die-line/crease grid (Front/Back panel width = Length, Side panel width = Breadth, main-row height = Height), then to the full design size for L &amp; B only — adjust any value if needed. Only PDFs carry real physical scale; a plain image can't auto-measure. The expected Inner size is calculated automatically and checked against the Inner artwork when you compare. Defaults below are set for a standard pack of 12.</p>
       <div class="hint" id="ms-autofill-status" style="margin-top:-4px;"></div>
       <div class="jc-grid">
         <div class="jc-field"><label>Monocarton L (mm)</label><input type="number" step="any" min="0" id="ms-mono-l" placeholder="auto from artwork"></div>
@@ -495,6 +495,17 @@
           <div class="jc-field"><label>Pack Size / Net Content</label><input type="text" id="jc-packsize" placeholder="e.g. 100 ml"></div>
           <div class="jc-field"><label>Quantity Ordered</label><input type="text" id="jc-qty" placeholder="e.g. 50,000 pcs"></div>
           <div class="jc-field"><label>Delivery Date</label><input type="date" id="jc-delivery"></div>
+        </div>
+      </div>
+
+      <div class="card printable">
+        <h2 style="font-size:17px;">Box Dimensions</h2>
+        <p class="hint no-print" style="margin-top:-4px;">Filled in automatically: first from the artwork's own blue measurement lines (Length/Breadth/Height), then from its printed die-line/crease grid (Front/Back panel width = Length, Side panel width = Breadth, main panel row = Height) if there are no blue lines — adjust if needed. Only PDFs carry real physical scale.</p>
+        <div class="hint no-print" id="jc-dims-status" style="margin-top:-4px;"></div>
+        <div class="jc-grid">
+          <div class="jc-field"><label>Length (mm)</label><input type="number" step="any" min="0" id="jc-length" placeholder="auto from artwork"></div>
+          <div class="jc-field"><label>Breadth / Width (mm)</label><input type="number" step="any" min="0" id="jc-breadth" placeholder="auto from artwork"></div>
+          <div class="jc-field"><label>Height (mm)</label><input type="number" step="any" min="0" id="jc-height" placeholder="auto from artwork"></div>
         </div>
       </div>
 
@@ -760,6 +771,49 @@ function loadFromDataUrl(dataUrl, mediaType, name, size, sourcePxPerMM){
   img.src = dataUrl;
 
   updateJobCardArtworkPreview();
+  autofillJobCardDimensions();
+}
+
+/* Measures the uploaded artwork's panel grid (preferred) or overall design size (fallback) and
+   fills the Job Card's Length, Breadth & Height automatically — same die-line detection used on
+   the Monocarton tab, applied to whichever artwork is uploaded for the Job Card. */
+async function autofillJobCardDimensions(){
+  const statusEl = document.getElementById('jc-dims-status');
+  if(!uploadedFile || !uploadedFile.sourcePxPerMM){
+    if(statusEl) statusEl.textContent = uploadedFile ? 'Only PDFs carry real physical scale — upload the artwork as a PDF to auto-measure.' : '';
+    return;
+  }
+  try{
+    const blue = await detectBlueDimensionLinesMM(uploadedFile);
+    if(blue){
+      document.getElementById('jc-length').value = blue.lengthMM.toFixed(1);
+      document.getElementById('jc-breadth').value = blue.breadthMM.toFixed(1);
+      document.getElementById('jc-height').value = blue.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s blue measurement lines — please double-check against the spec.';
+      saveJobCardDraft();
+      return;
+    }
+  }catch(e){ /* fall through to die-line panel detection below */ }
+  try{
+    const panels = await detectCartonPanelsMM(uploadedFile, 1, 1);
+    if(panels){
+      document.getElementById('jc-length').value = panels.lengthMM.toFixed(1);
+      document.getElementById('jc-breadth').value = panels.breadthMM.toFixed(1);
+      document.getElementById('jc-height').value = panels.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected from the artwork’s die-line grid (' + panels.panelsDetected + ' panels found) — please double-check against the spec.';
+      saveJobCardDraft();
+      return;
+    }
+  }catch(e){ /* fall through to the bounding-box fallback below */ }
+  try{
+    const size = await getDesignSizeMM(uploadedFile, 1, 1);
+    if(size){
+      document.getElementById('jc-length').value = size.wMM.toFixed(1);
+      document.getElementById('jc-breadth').value = size.hMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Couldn’t find a clear die-line grid on this artwork — used the full design size for Length & Breadth instead. Enter Height by hand.';
+      saveJobCardDraft();
+    }
+  }catch(e){ /* measurement failed — manual entry still works */ }
 }
 
 /* ================= tabs ================= */
@@ -1511,6 +1565,17 @@ async function autofillMonocartonSize(){
   const repDown = parseInt(document.getElementById('ms-mono-rep-down').value, 10) || 1;
   const statusEl = document.getElementById('ms-autofill-status');
   try{
+    const blue = await detectBlueDimensionLinesMM(compareFileA);
+    if(blue){
+      document.getElementById('ms-mono-l').value = blue.lengthMM.toFixed(1);
+      document.getElementById('ms-mono-b').value = blue.breadthMM.toFixed(1);
+      document.getElementById('ms-mono-h').value = blue.heightMM.toFixed(1);
+      if(statusEl) statusEl.textContent = 'Auto-detected L, B & H from the artwork’s blue measurement lines — please double-check these against the spec.';
+      updatePackCalcPreview();
+      return;
+    }
+  }catch(e){ /* fall through to die-line panel detection below */ }
+  try{
     const panels = await detectCartonPanelsMM(compareFileA, repAcross, repDown);
     if(panels){
       document.getElementById('ms-mono-l').value = panels.lengthMM.toFixed(1);
@@ -1590,6 +1655,92 @@ function findWidthPairs(segments, relTol){
    panel width) and Height (main panel row, between its top/bottom creases) in mm. Returns null
    if no reliable die-line grid is found, so the caller can fall back to the plain design-size
    measurement. */
+/* ---- blue dimension-line detection: some artwork marks its own Length/Breadth/Height with a
+   blue measurement guide line (a straight ruler, not the red die-line) — when present, reading
+   those directly is more precise and intentional than inferring panel widths off the die-line,
+   and avoids accidentally measuring an unrelated green trim/border outline some files carry. ---- */
+function isBlueDimColor(r,g,b){
+  return b>170 && (b-r)>60 && (b-g)>5;
+}
+
+function longestRunInRow(mask, width, y){
+  let best=0, bestStart=0, cur=0, curStart=0;
+  const rowOffset = y*width;
+  for(let x=0;x<width;x++){
+    if(mask[rowOffset+x]){
+      if(cur===0) curStart=x;
+      cur++;
+      if(cur>best){ best=cur; bestStart=curStart; }
+    } else cur=0;
+  }
+  return { start:bestStart, len:best };
+}
+
+function longestRunInCol(mask, width, height, x){
+  let best=0, bestStart=0, cur=0, curStart=0;
+  for(let y=0;y<height;y++){
+    if(mask[y*width+x]){
+      if(cur===0) curStart=y;
+      cur++;
+      if(cur>best){ best=cur; bestStart=curStart; }
+    } else cur=0;
+  }
+  return { start:bestStart, len:best };
+}
+
+function clusterLineCandidates(cands, keyName){
+  const out=[];
+  let cur=[];
+  for(let i=0;i<cands.length;i++){
+    if(cur.length===0 || cands[i][keyName]-cur[cur.length-1][keyName]<=3){ cur.push(cands[i]); }
+    else { out.push(cur); cur=[cands[i]]; }
+  }
+  if(cur.length) out.push(cur);
+  return out.map(group => group.reduce((a,b)=> b.len>a.len ? b : a));
+}
+
+/* Returns {lengthMM, breadthMM, heightMM} read directly off blue measurement-guide lines, or
+   null if the artwork doesn't have a clear pair of horizontal lines (Length, then Breadth,
+   top to bottom) plus a vertical line (Height). */
+async function detectBlueDimensionLinesMM(file){
+  if(!file || !file.sourcePxPerMM) return null;
+  const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
+  const imageData = ctx.getImageData(0,0,width,height);
+  const data = imageData.data;
+  const mask = new Uint8Array(width*height);
+  let any=false;
+  for(let i=0,p=0; i<data.length; i+=4, p++){
+    if(data[i+3]<=10) continue;
+    if(isBlueDimColor(data[i],data[i+1],data[i+2])){ mask[p]=1; any=true; }
+  }
+  if(!any) return null;
+
+  const minLineLenPx = Math.max(20, Math.round(file.sourcePxPerMM*3)); // ignore short runs (label text strokes)
+
+  const hCandidates = [];
+  for(let y=0;y<height;y++){
+    const r = longestRunInRow(mask, width, y);
+    if(r.len>=minLineLenPx) hCandidates.push({ y, start:r.start, len:r.len });
+  }
+  const hLines = clusterLineCandidates(hCandidates, 'y').sort((a,b)=>a.y-b.y); // top to bottom
+
+  const vCandidates = [];
+  for(let x=0;x<width;x++){
+    const r = longestRunInCol(mask, width, height, x);
+    if(r.len>=minLineLenPx) vCandidates.push({ x, start:r.start, len:r.len });
+  }
+  const vLines = clusterLineCandidates(vCandidates, 'x').sort((a,b)=>b.len-a.len); // longest first
+
+  if(hLines.length<2 || vLines.length<1) return null;
+
+  const pxPerMM = file.sourcePxPerMM;
+  return {
+    lengthMM: hLines[0].len/pxPerMM,
+    breadthMM: hLines[1].len/pxPerMM,
+    heightMM: vLines[0].len/pxPerMM
+  };
+}
+
 async function detectCartonPanelsMM(file, repeatsAcross, repeatsDown){
   if(!file || !file.sourcePxPerMM) return null;
   const { ctx, width, height } = await getCanvasFromDataUrl(file.dataUrl);
@@ -2049,6 +2200,7 @@ async function renderCompareResults(parsed){
 /* ================= job card ================= */
 const JOBCARD_FIELD_IDS = [
   'jc-jobno','jc-date','jc-customer','jc-product','jc-formcode','jc-packsize','jc-qty','jc-delivery',
+  'jc-length','jc-breadth','jc-height',
   'jc-paper-type','jc-gsm','jc-metpet',
   'jc-lamination','jc-hybriduv','jc-varnish','jc-foil','jc-emboss','jc-diecut','jc-pasting','jc-window','jc-packing','jc-remarks'
 ];
